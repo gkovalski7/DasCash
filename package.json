@@ -1,0 +1,11 @@
+{
+  "name": "cashback",
+  "private": true,
+  "workspaces": ["apps/web"],
+  "scripts": {
+    "dev": "npm run dev --workspace=apps/web",
+    "build": "npm run build --workspace=apps/web",
+    "lint": "npm run lint --workspace=apps/web",
+    "install:web": "npm install --workspace=apps/web"
+  }
+}
