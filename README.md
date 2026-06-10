@@ -1,6 +1,6 @@
-# Cashback Monorepo
+# DasCash
 
-Plataforma de cashback inspirada en FlipGive. Monorepo con frontend (Vite + React + TS + Tailwind) y backend (Django 5 + DRF + SimpleJWT) con base de datos PostgreSQL.
+Plataforma de cashback con propósito social, inspirada en FlipGive: el cashback de las compras se convierte en donaciones a causas elegidas por el usuario. Monorepo con frontend (Vite + React + TS + Tailwind) y backend (Django + DRF + SimpleJWT) con base de datos PostgreSQL. Documentación completa en [`docs/`](docs/).
 
 ## Requisitos
 

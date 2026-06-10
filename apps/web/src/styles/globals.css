@@ -1,0 +1,67 @@
+@import './tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0b0b0b;
+}
+
+body {
+  @apply bg-white text-gray-900 antialiased;
+  overflow-x: hidden; /* Prevent accidental horizontal scroll from full-bleed sections */
+}
+
+@keyframes scanLine {
+  0%, 100% { transform: translateY(-48px); opacity: 0; }
+  20%, 80%  { opacity: 1; }
+  50%       { transform: translateY(48px); }
+}
+
+/* Brands carousel marquee */
+@keyframes scroll-x {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-scroll-x {
+  animation-name: scroll-x;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+/* Dual-track marquee for perfectly seamless loop */
+@keyframes marquee-a {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes marquee-b {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.animate-marquee-a {
+  animation-name: marquee-a;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.animate-marquee-b {
+  animation-name: marquee-b;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}

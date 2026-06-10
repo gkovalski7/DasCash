@@ -1,0 +1,31 @@
+# Node
+node_modules
+npm-debug.log
+
+# Python
+__pycache__
+*.py[cod]
+*.pyo
+*.pyd
+.venv
+
+# Vite
+apps/web/dist
+apps/web/.vite
+
+# Env
+.env
+**/.env
+
+# Build caches
+*.tsbuildinfo
+
+# DB local
+db.sqlite3
+
+# Claude Code (config personal)
+.claude/settings.local.json
+
+# OS
+.DS_Store
+Thumbs.db
