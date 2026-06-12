@@ -16,10 +16,15 @@ class RegisterSerializer(serializers.ModelSerializer):
         choices=[("CONSUMER", "CONSUMER"), ("MERCHANT", "MERCHANT")],
         default="CONSUMER",
     )
+    preferred_cause = serializers.PrimaryKeyRelatedField(
+        queryset=Cause.objects.filter(is_active=True),
+        allow_null=True,
+        required=False,
+    )
 
     class Meta:
         model = User
-        fields = ("id", "email", "username", "password", "role")
+        fields = ("id", "email", "username", "password", "role", "preferred_cause")
         extra_kwargs = {
             "username": {"required": False},
         }

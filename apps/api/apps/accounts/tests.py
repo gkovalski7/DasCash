@@ -231,3 +231,34 @@ class PreferredCauseProfileTests(TestCase):
             "/api/profile/", {"preferred_cause": self.cause_inactive.id}, format="json"
         )
         self.assertEqual(res.status_code, 400)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# K. preferred_cause en registro
+# ═══════════════════════════════════════════════════════════════════════════
+class RegisterPreferredCauseTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.cause = Cause.objects.create(title="Club Registro", category="Deporte", is_active=True)
+
+    def setUp(self):
+        self.client = APIClient()
+
+    def test_registro_con_preferred_cause(self):
+        res = self.client.post(
+            "/api/auth/register",
+            {"email": "nuevo@t.com", "password": "Pass1234!", "preferred_cause": self.cause.id},
+            format="json",
+        )
+        self.assertIn(res.status_code, (200, 201))
+        user = User.objects.get(email="nuevo@t.com")
+        self.assertEqual(user.preferred_cause_id, self.cause.id)
+
+    def test_registro_sin_preferred_cause_sigue_funcionando(self):
+        res = self.client.post(
+            "/api/auth/register",
+            {"email": "n2@t.com", "password": "Pass1234!"},
+            format="json",
+        )
+        self.assertIn(res.status_code, (200, 201))
+        self.assertIsNone(User.objects.get(email="n2@t.com").preferred_cause)
