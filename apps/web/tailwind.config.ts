@@ -8,6 +8,7 @@ export default {
         display: ['"Plus Jakarta Sans"', 'sans-serif'],
         body:    ['"DM Sans"', 'sans-serif'],
         sans:    ['"DM Sans"', 'sans-serif'],
+        app:     ['"Nunito"', 'sans-serif'],
       },
       colors: {
         brand: {
@@ -21,6 +22,10 @@ export default {
           'gray-500': '#6B7280',
           'lime-400': '#A3E635',
           'lime-300': '#BEF264',
+          'green-600': '#65A30D',
+          'green-700': '#3F6212',
+          'green-50':  '#F0FDF4',
+          'app-bg':    '#F8FAF7',
           'cream':    '#FAFAF8',
           'white':    '#FFFFFF',
         },
