@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { Search } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchCategories, fetchStores } from '../../lib/api'
 import { isAuthenticated } from '../../lib/auth'
 import StoreCard, { StoreItem, Category } from '../../components/StoreCard'
+import ScreenHeader from '../../components/app/ScreenHeader'
 
 export default function StoresPage() {
   const navigate = useNavigate()
@@ -73,67 +75,66 @@ export default function StoresPage() {
   const showGlobalNotice = useMemo(() => stores.some(s => s.has_excluded_categories), [stores])
 
   return (
-    <div className="min-h-screen bg-white pt-6 pb-12">
-      <div className="mx-auto max-w-screen-xl px-6 md:px-8 lg:px-10">
-        <div className="mb-4">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Tiendas</h1>
+    <div>
+      <ScreenHeader title="Comercios adheridos">
+        <div className="relative mt-3">
+          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-white rounded-xl text-sm font-app text-gray-800
+                       placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-lime-400"
+            placeholder="Buscar por nombre o descripción"
+            aria-label="Buscar tiendas"
+          />
         </div>
+      </ScreenHeader>
 
+      <div className="px-4 py-4 space-y-4">
         {/* Filtros */}
-        <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between mb-4">
-          <div className="flex-1">
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Buscar por nombre o descripción"
-              aria-label="Buscar tiendas"
-            />
-          </div>
-          <div className="flex items-center gap-3">
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg bg-white"
-              aria-label="Filtrar por categoría"
-            >
-              <option value="">Todas las categorías</option>
-              {categories.map((c) => (
-                <option key={c.id} value={String(c.slug)}>
-                  {c.name} {c.participates_in_cashback ? '' : '(sin cashback)'}
-                </option>
-              ))}
-            </select>
-            <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-              <input type="checkbox" checked={onlyCashback} onChange={(e) => setOnlyCashback(e.target.checked)} />
-              Solo con cashback
-            </label>
-          </div>
+        <div className="flex items-center gap-3">
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-xl bg-white text-sm font-app focus:outline-none focus:ring-2 focus:ring-brand-lime-400"
+            aria-label="Filtrar por categoría"
+          >
+            <option value="">Todas las categorías</option>
+            {categories.map((c) => (
+              <option key={c.id} value={String(c.slug)}>
+                {c.name} {c.participates_in_cashback ? '' : '(sin cashback)'}
+              </option>
+            ))}
+          </select>
+          <label className="inline-flex items-center gap-2 text-sm text-gray-700 font-app">
+            <input type="checkbox" checked={onlyCashback} onChange={(e) => setOnlyCashback(e.target.checked)} className="focus:ring-brand-lime-400" />
+            Solo con cashback
+          </label>
         </div>
 
         {/* Aviso global */}
         {showGlobalNotice && (
-          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900">
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-amber-900 text-sm">
             Algunas tiendas tienen categorías excluidas del cashback. Revisa los avisos en cada tarjeta.
           </div>
         )}
 
         {/* Estados */}
         {loading && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-pulse">
-            {[...Array(6)].map((_,i)=>(<div key={i} className="h-44 rounded-lg bg-gray-100" />))}
+          <div className="space-y-3 animate-pulse">
+            {[...Array(6)].map((_,i)=>(<div key={i} className="h-28 rounded-2xl bg-gray-200/70" />))}
           </div>
         )}
         {error && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-red-800">{error}</div>
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-red-800">{error}</div>
         )}
         {!loading && !error && stores.length === 0 && (
-          <div className="text-gray-600">No se encontraron tiendas.</div>
+          <div className="text-gray-600 text-center py-16">No se encontraron tiendas.</div>
         )}
 
-        {/* Grid */}
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Lista */}
+        <div className="space-y-3">
           {stores.map((s) => (
             <StoreCard key={s.id} store={s} />
           ))}
@@ -141,21 +142,21 @@ export default function StoresPage() {
 
         {/* Paginación */}
         {totalPages > 1 && (
-          <div className="mt-8 flex items-center justify-center gap-3">
+          <div className="flex items-center justify-center gap-3 pt-2">
             <button
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="px-4 py-2 text-sm rounded-lg border border-gray-300 disabled:opacity-40 hover:bg-gray-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-sm font-app rounded-xl border border-gray-300 disabled:opacity-40 hover:bg-brand-green-50 disabled:cursor-not-allowed"
             >
               Anterior
             </button>
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-gray-600 font-app">
               Página {page} de {totalPages}
             </span>
             <button
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="px-4 py-2 text-sm rounded-lg border border-gray-300 disabled:opacity-40 hover:bg-gray-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-sm font-app rounded-xl border border-gray-300 disabled:opacity-40 hover:bg-brand-green-50 disabled:cursor-not-allowed"
             >
               Siguiente
             </button>

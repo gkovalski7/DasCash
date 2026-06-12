@@ -1,8 +1,6 @@
 import React from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Card } from './ui/Card'
-import { Button } from './ui/Button'
-import CategoryNotice from './CategoryNotice'
+import { Link } from 'react-router-dom'
+import { Store as StoreIcon, Heart } from 'lucide-react'
 import type { ApiCategory, ApiStore, ApiStoreSupportedCause } from '../lib/api'
 
 // Aliases de los tipos de la capa de API: una sola fuente de verdad (lib/api.ts)
@@ -12,80 +10,41 @@ export type StoreItem = ApiStore
 
 const StoreCard: React.FC<{ store: StoreItem }> = ({ store }) => {
   const causes = store.supported_causes ?? []
-  const navigate = useNavigate()
 
   return (
-    <Card className="flex flex-col p-0 overflow-hidden">
-      {/* Cover */}
-      <div className="relative h-32 w-full bg-gray-100">
-        {store.logo_url ? (
-          <img src={store.logo_url} alt={`Logo de ${store.display_name}`} className="absolute inset-0 h-full w-full object-cover" />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-gray-500">Sin imagen</div>
-        )}
+    <Link
+      to={`/app/stores/${store.id}`}
+      className="block bg-white rounded-2xl overflow-hidden shadow-[0_1px_6px_rgba(10,34,54,0.08)]
+                 hover:shadow-md transition-shadow"
+    >
+      <div className="h-20 bg-gradient-to-br from-brand-navy-900 to-brand-green-600 flex items-center justify-center">
+        {store.logo_url
+          ? <img src={store.logo_url} alt={store.display_name} className="h-12 w-12 rounded-xl object-cover" />
+          : <StoreIconFallback />}
       </div>
-
-      {/* Body */}
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="text-base font-semibold text-gray-900">{store.display_name}</h3>
-        </div>
-        {store.description && (
-          <p className="mt-2 text-sm text-gray-700 line-clamp-2" style={{ display: '-webkit-box', WebkitLineClamp: 2 as any, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden' }}>
-            {store.description}
+      <div className="px-4 py-3 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="font-app font-extrabold text-brand-navy-900 truncate">{store.display_name}</h3>
+          <p className="text-xs text-gray-400 truncate">
+            {[store.categories.map((c) => c.name).join(' · '), store.address].filter(Boolean).join(' — ')}
           </p>
-        )}
-        {/* Categories */}
-        <div className="mt-2 text-xs text-gray-700">
-          {store.categories.map(c => (
-            <span key={c.id} className={`mr-2 mb-1 inline-block rounded-full px-2 py-0.5 border ${c.participates_in_cashback ? 'border-gray-200 text-gray-700' : 'border-amber-300 text-amber-800'}`}>
-              {c.name}{!c.participates_in_cashback ? ' • sin cashback' : ''}
-            </span>
-          ))}
         </div>
-
-        {/* Supported causes */}
-        {causes.length > 0 ? (
-          <div className="mt-3">
-            <p className="text-xs font-medium text-gray-500 mb-1">Causas que apoya</p>
-            <div className="flex flex-wrap gap-1">
-              {causes.map(c => (
-                <span key={c.cause_id} className="inline-block rounded-full bg-green-50 border border-green-200 text-green-800 px-2 py-0.5 text-xs">
-                  {c.title}
-                </span>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="mt-3">
-            <p className="text-xs text-gray-400 italic">Sin causas asignadas</p>
-          </div>
+        {causes.length > 0 && (
+          <span className="flex-shrink-0 inline-flex items-center gap-1 bg-brand-green-50 text-brand-green-700
+                           text-xs font-bold px-2.5 py-1 rounded-lg">
+            <Heart size={11} className="fill-current" /> {causes.length} causa{causes.length !== 1 ? 's' : ''}
+          </span>
         )}
-
-        {/* Local notice */}
-        {store.has_excluded_categories && store.excluded_categories && store.excluded_categories.length > 0 && (
-          <div className="mt-3">
-            <CategoryNotice categories={store.excluded_categories} />
-          </div>
-        )}
-
-        <div className="mt-4 flex gap-2">
-          <Button className="h-9 px-3 text-sm" onClick={() => navigate(`/app/stores/${store.id}`)}>
-            Registrar compra
-          </Button>
-          {store.website_url && (
-            <a href={store.website_url} target="_blank" rel="noopener noreferrer">
-              <Button variant="secondary" className="h-9 px-3 text-sm">Sitio</Button>
-            </a>
-          )}
-          {store.instagram_url && (
-            <a href={store.instagram_url} target="_blank" rel="noopener noreferrer">
-              <Button variant="secondary" className="h-9 px-3 text-sm">Instagram</Button>
-            </a>
-          )}
-        </div>
       </div>
-    </Card>
+    </Link>
+  )
+}
+
+function StoreIconFallback() {
+  return (
+    <div className="h-12 w-12 rounded-xl bg-white/15 flex items-center justify-center">
+      <StoreIcon size={22} className="text-white" />
+    </div>
   )
 }
 

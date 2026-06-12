@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Search, Store as StoreIcon, Heart } from 'lucide-react'
+import { Search, Store as StoreIcon } from 'lucide-react'
 import {
   get, fetchStores, getProfile, getProfileDonations,
   type ApiStore, type ApiCategory, type ApiProfile, type ApiDonation,
@@ -8,6 +7,7 @@ import {
 import ScreenHeader from '../../components/app/ScreenHeader'
 import ProgressBar from '../../components/app/ProgressBar'
 import Chip from '../../components/app/Chip'
+import StoreCard from '../../components/StoreCard'
 
 export default function HomePage() {
   const [loading, setLoading] = useState(true)
@@ -117,48 +117,10 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {stores.map((s) => <HomeStoreCard key={s.id} store={s} />)}
+            {stores.map((s) => <StoreCard key={s.id} store={s} />)}
           </div>
         )}
       </div>
-    </div>
-  )
-}
-
-function HomeStoreCard({ store }: { store: ApiStore }) {
-  return (
-    <Link
-      to={`/app/stores/${store.id}`}
-      className="block bg-white rounded-2xl overflow-hidden shadow-[0_1px_6px_rgba(10,34,54,0.08)]
-                 hover:shadow-md transition-shadow"
-    >
-      <div className="h-20 bg-gradient-to-br from-brand-navy-900 to-brand-green-600 flex items-center justify-center">
-        {store.logo_url
-          ? <img src={store.logo_url} alt={store.display_name} className="h-12 w-12 rounded-xl object-cover" />
-          : <StoreIconFallback />}
-      </div>
-      <div className="px-4 py-3 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="font-app font-extrabold text-brand-navy-900 truncate">{store.display_name}</h3>
-          <p className="text-xs text-gray-400 truncate">
-            {[store.categories.map((c) => c.name).join(' · '), store.address].filter(Boolean).join(' — ')}
-          </p>
-        </div>
-        {store.supported_causes.length > 0 && (
-          <span className="flex-shrink-0 inline-flex items-center gap-1 bg-brand-green-50 text-brand-green-700
-                           text-xs font-bold px-2.5 py-1 rounded-lg">
-            <Heart size={11} className="fill-current" /> {store.supported_causes.length} causa{store.supported_causes.length !== 1 ? 's' : ''}
-          </span>
-        )}
-      </div>
-    </Link>
-  )
-}
-
-function StoreIconFallback() {
-  return (
-    <div className="h-12 w-12 rounded-xl bg-white/15 flex items-center justify-center">
-      <StoreIcon size={22} className="text-white" />
     </div>
   )
 }

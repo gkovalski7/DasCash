@@ -1,16 +1,19 @@
 import React from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
+import { Heart, QrCode } from 'lucide-react'
 import { fetchStore, createPurchase } from '../../lib/api'
 import type { ApiStore } from '../../lib/api'
 import CauseSelector from '../../components/CauseSelector'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import CategoryNotice from '../../components/CategoryNotice'
+import ScreenHeader from '../../components/app/ScreenHeader'
 
 type SubmitState = { kind: 'idle' } | { kind: 'loading' } | { kind: 'success' } | { kind: 'error'; message: string }
 
 export default function StoreDetailPage() {
     const { id } = useParams<{ id: string }>()
+    const navigate = useNavigate()
     const [store, setStore] = React.useState<ApiStore | null>(null)
     const [loading, setLoading] = React.useState(true)
     const [error, setError] = React.useState<string | null>(null)
@@ -58,11 +61,11 @@ export default function StoreDetailPage() {
 
     if (loading) {
         return (
-            <div className="mx-auto max-w-2xl px-6 py-12">
+            <div className="px-4 py-6">
                 <div className="animate-pulse space-y-4">
-                    <div className="h-48 rounded-lg bg-gray-100" />
-                    <div className="h-6 w-2/3 rounded bg-gray-100" />
-                    <div className="h-4 w-1/2 rounded bg-gray-100" />
+                    <div className="h-28 rounded-2xl bg-gray-200/70" />
+                    <div className="h-6 w-2/3 rounded bg-gray-200/70" />
+                    <div className="h-4 w-1/2 rounded bg-gray-200/70" />
                 </div>
             </div>
         )
@@ -70,10 +73,10 @@ export default function StoreDetailPage() {
 
     if (error || !store) {
         return (
-            <div className="mx-auto max-w-2xl px-6 py-12">
+            <div className="px-4 py-6">
                 <Card className="text-center py-8">
                     <p className="text-red-600 font-medium">{error || 'Tienda no encontrada'}</p>
-                    <Link to="/app/stores" className="mt-4 inline-block text-sm text-blue-600 hover:underline">
+                    <Link to="/app/stores" className="mt-4 inline-block text-sm text-brand-green-700 hover:underline">
                         ← Volver a tiendas
                     </Link>
                 </Card>
@@ -84,159 +87,178 @@ export default function StoreDetailPage() {
     const causes = store.supported_causes ?? []
 
     return (
-        <div className="mx-auto max-w-2xl px-6 py-8">
-            {/* Back link */}
-            <Link to="/app/stores" className="text-sm text-gray-500 hover:text-gray-900 mb-4 inline-block">
-                ← Volver a tiendas
-            </Link>
+        <div>
+            <ScreenHeader
+                eyebrow={store.address || undefined}
+                title={store.display_name}
+            />
 
-            {/* Store info */}
-            <Card className="p-0 overflow-hidden mb-6">
-                <div className="relative h-48 w-full bg-gray-100">
-                    {store.logo_url ? (
-                        <img src={store.logo_url} alt={store.display_name} className="absolute inset-0 h-full w-full object-cover" />
-                    ) : (
-                        <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-lg">Sin imagen</div>
-                    )}
-                </div>
-                <div className="p-5">
-                    <h1 className="text-xl font-bold text-gray-900">{store.display_name}</h1>
-                    {store.description && <p className="mt-2 text-sm text-gray-700">{store.description}</p>}
+            <div className="px-4 py-4 space-y-4">
+                {/* Back link */}
+                <Link to="/app/stores" className="text-sm text-gray-500 hover:text-brand-green-700 inline-block">
+                    ← Volver a tiendas
+                </Link>
 
-                    {/* Categories */}
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                        {store.categories.map(c => (
-                            <span key={c.id} className={`inline-block rounded-full px-2 py-0.5 text-xs border ${c.participates_in_cashback ? 'border-gray-200 text-gray-700' : 'border-amber-300 text-amber-800'}`}>
-                                {c.name}{!c.participates_in_cashback ? ' • sin cashback' : ''}
-                            </span>
-                        ))}
-                    </div>
-
-                    {/* Supported causes */}
-                    {causes.length > 0 && (
-                        <div className="mt-3">
-                            <p className="text-xs font-medium text-gray-500 mb-1">Causas que apoya</p>
-                            <div className="flex flex-wrap gap-1">
-                                {causes.map(c => (
-                                    <span key={c.cause_id} className="inline-block rounded-full bg-green-50 border border-green-200 text-green-800 px-2 py-0.5 text-xs">
-                                        {c.title}
-                                    </span>
-                                ))}
+                {/* Store info */}
+                <Card className="p-0 overflow-hidden">
+                    <div className="relative h-32 w-full bg-gradient-to-br from-brand-navy-900 to-brand-green-600 flex items-center justify-center">
+                        {store.logo_url ? (
+                            <img src={store.logo_url} alt={store.display_name} className="absolute inset-0 h-full w-full object-cover" />
+                        ) : (
+                            <div className="h-14 w-14 rounded-xl bg-white/15 flex items-center justify-center text-white text-sm font-app">
+                                {store.display_name.charAt(0)}
                             </div>
-                        </div>
-                    )}
-
-                    {store.has_excluded_categories && store.excluded_categories && store.excluded_categories.length > 0 && (
-                        <div className="mt-3">
-                            <CategoryNotice categories={store.excluded_categories} />
-                        </div>
-                    )}
-
-                    <div className="mt-4 flex gap-2">
-                        {store.website_url && (
-                            <a href={store.website_url} target="_blank" rel="noopener noreferrer">
-                                <Button variant="secondary" className="h-8 px-3 text-xs">Sitio web</Button>
-                            </a>
-                        )}
-                        {store.instagram_url && (
-                            <a href={store.instagram_url} target="_blank" rel="noopener noreferrer">
-                                <Button variant="secondary" className="h-8 px-3 text-xs">Instagram</Button>
-                            </a>
                         )}
                     </div>
-                </div>
-            </Card>
+                    <div className="p-4">
+                        {store.description && <p className="text-sm text-gray-700">{store.description}</p>}
 
-            {/* Purchase form */}
-            <Card>
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Registrar compra</h2>
-
-                {submitState.kind === 'success' ? (
-                    <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-center">
-                        <p className="text-green-800 font-medium">¡Compra registrada!</p>
-                        <p className="text-green-700 text-sm mt-1">Tu compra está pendiente de aprobación. Podés seguir su estado desde "Mis Compras".</p>
-                        <div className="mt-4 flex justify-center gap-3">
-                            <Button variant="secondary" className="text-sm" onClick={() => setSubmitState({ kind: 'idle' })}>
-                                Registrar otra
-                            </Button>
-                            <Link to="/app/purchases">
-                                <Button className="text-sm">Ver mis compras</Button>
-                            </Link>
-                        </div>
-                    </div>
-                ) : (
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        {/* Amount */}
-                        <div>
-                            <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-1">
-                                Monto de la compra ($)
-                            </label>
-                            <input
-                                id="amount"
-                                type="number"
-                                step="0.01"
-                                min="0.01"
-                                required
-                                value={amount}
-                                onChange={e => setAmount(e.target.value)}
-                                placeholder="0.00"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                disabled={submitState.kind === 'loading'}
-                            />
+                        {/* Categories */}
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                            {store.categories.map(c => (
+                                <span key={c.id} className={`inline-block rounded-full px-2 py-0.5 text-xs border font-app ${c.participates_in_cashback ? 'border-gray-200 text-gray-700' : 'border-amber-300 text-amber-800'}`}>
+                                    {c.name}{!c.participates_in_cashback ? ' • sin cashback' : ''}
+                                </span>
+                            ))}
                         </div>
 
-                        {/* Source */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                ¿Cómo realizaste la compra?
-                            </label>
-                            <div className="flex gap-2">
-                                {(['QR', 'LINK', 'RECEIPT'] as const).map(s => (
-                                    <button
-                                        key={s}
-                                        type="button"
-                                        onClick={() => setSource(s)}
-                                        className={`flex-1 px-3 py-2 text-sm rounded-lg border transition-colors ${source === s ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium' : 'border-gray-300 text-gray-600 hover:border-gray-400'}`}
-                                        disabled={submitState.kind === 'loading'}
-                                    >
-                                        {s === 'QR' ? 'Código QR' : s === 'LINK' ? 'Link' : 'Ticket'}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Cause selector */}
-                        <div>
-                            <CauseSelector
-                                causes={causes}
-                                value={selectedCause}
-                                onChange={setSelectedCause}
-                                disabled={submitState.kind === 'loading'}
-                            />
-                        </div>
-
-                        {/* Error */}
-                        {submitState.kind === 'error' && (
-                            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3">
-                                <p className="text-sm text-red-700">{submitState.message}</p>
+                        {store.has_excluded_categories && store.excluded_categories && store.excluded_categories.length > 0 && (
+                            <div className="mt-3">
+                                <CategoryNotice categories={store.excluded_categories} />
                             </div>
                         )}
 
-                        {/* Submit */}
-                        <Button
-                            type="submit"
-                            className="w-full h-11"
-                            disabled={submitState.kind === 'loading' || !amount}
-                        >
-                            {submitState.kind === 'loading' ? 'Registrando...' : 'Registrar compra'}
-                        </Button>
+                        <div className="mt-4 flex gap-2">
+                            {store.website_url && (
+                                <a href={store.website_url} target="_blank" rel="noopener noreferrer">
+                                    <Button variant="secondary" className="h-8 px-3 text-xs">Sitio web</Button>
+                                </a>
+                            )}
+                            {store.instagram_url && (
+                                <a href={store.instagram_url} target="_blank" rel="noopener noreferrer">
+                                    <Button variant="secondary" className="h-8 px-3 text-xs">Instagram</Button>
+                                </a>
+                            )}
+                        </div>
+                    </div>
+                </Card>
 
-                        <p className="text-xs text-gray-500 text-center">
-                            Tu compra será revisada y, si hay campaña activa, el cashback se calculará al aprobarse.
-                        </p>
-                    </form>
+                {/* QR payment CTA */}
+                {store.qrcode_slug && (
+                    <Button
+                        className="w-full h-12 bg-brand-green-600 hover:bg-brand-green-700 focus:ring-brand-lime-400"
+                        onClick={() => navigate(`/app/pagar/${store.qrcode_slug}`)}
+                    >
+                        <QrCode size={18} className="mr-2" /> Pagar acá con QR
+                    </Button>
                 )}
-            </Card>
+
+                {/* Supported causes */}
+                {causes.length > 0 && (
+                    <div>
+                        <p className="text-xs font-medium text-gray-500 mb-2 font-app">Causas que apoya</p>
+                        <div className="space-y-2">
+                            {causes.map(c => (
+                                <div key={c.cause_id} className="bg-white rounded-2xl px-4 py-3 flex items-center gap-2 shadow-[0_1px_6px_rgba(10,34,54,0.08)]">
+                                    <Heart size={16} className="text-brand-green-600 fill-current flex-shrink-0" />
+                                    <span className="text-sm font-app text-brand-navy-900">{c.title}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Purchase form */}
+                <Card>
+                    <h2 className="text-lg font-app font-semibold text-gray-900 mb-4">Registrar compra</h2>
+
+                    {submitState.kind === 'success' ? (
+                        <div className="rounded-2xl border border-green-200 bg-brand-green-50 p-4 text-center">
+                            <p className="text-green-800 font-medium">¡Compra registrada!</p>
+                            <p className="text-green-700 text-sm mt-1">Tu compra está pendiente de aprobación. Podés seguir su estado desde "Mis Compras".</p>
+                            <div className="mt-4 flex justify-center gap-3">
+                                <Button variant="secondary" className="text-sm" onClick={() => setSubmitState({ kind: 'idle' })}>
+                                    Registrar otra
+                                </Button>
+                                <Link to="/app/purchases">
+                                    <Button className="text-sm bg-brand-green-600 hover:bg-brand-green-700 focus:ring-brand-lime-400">Ver mis compras</Button>
+                                </Link>
+                            </div>
+                        </div>
+                    ) : (
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            {/* Amount */}
+                            <div>
+                                <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-1">
+                                    Monto de la compra ($)
+                                </label>
+                                <input
+                                    id="amount"
+                                    type="number"
+                                    step="0.01"
+                                    min="0.01"
+                                    required
+                                    value={amount}
+                                    onChange={e => setAmount(e.target.value)}
+                                    placeholder="0.00"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-lime-400 focus:border-transparent"
+                                    disabled={submitState.kind === 'loading'}
+                                />
+                            </div>
+
+                            {/* Source */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    ¿Cómo realizaste la compra?
+                                </label>
+                                <div className="flex gap-2">
+                                    {(['QR', 'LINK', 'RECEIPT'] as const).map(s => (
+                                        <button
+                                            key={s}
+                                            type="button"
+                                            onClick={() => setSource(s)}
+                                            className={`flex-1 px-3 py-2 text-sm rounded-xl border transition-colors ${source === s ? 'border-brand-green-600 bg-brand-green-50 text-brand-green-700 font-medium' : 'border-gray-300 text-gray-600 hover:border-gray-400'}`}
+                                            disabled={submitState.kind === 'loading'}
+                                        >
+                                            {s === 'QR' ? 'Código QR' : s === 'LINK' ? 'Link' : 'Ticket'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Cause selector */}
+                            <div>
+                                <CauseSelector
+                                    causes={causes}
+                                    value={selectedCause}
+                                    onChange={setSelectedCause}
+                                    disabled={submitState.kind === 'loading'}
+                                />
+                            </div>
+
+                            {/* Error */}
+                            {submitState.kind === 'error' && (
+                                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                                    <p className="text-sm text-red-700">{submitState.message}</p>
+                                </div>
+                            )}
+
+                            {/* Submit */}
+                            <Button
+                                type="submit"
+                                className="w-full h-11 bg-brand-green-600 hover:bg-brand-green-700 focus:ring-brand-lime-400"
+                                disabled={submitState.kind === 'loading' || !amount}
+                            >
+                                {submitState.kind === 'loading' ? 'Registrando...' : 'Registrar compra'}
+                            </Button>
+
+                            <p className="text-xs text-gray-500 text-center">
+                                Tu compra será revisada y, si hay campaña activa, el cashback se calculará al aprobarse.
+                            </p>
+                        </form>
+                    )}
+                </Card>
+            </div>
         </div>
     )
 }
