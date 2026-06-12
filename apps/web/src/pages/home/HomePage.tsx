@@ -1,180 +1,123 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
-import { Search, Heart, TrendingUp, ArrowRight } from 'lucide-react'
-import { fetchCauses, fetchFeaturedCauses, getProfile, type ApiCause, type ApiProfile } from '../../lib/api'
+import { Link } from 'react-router-dom'
+import { Search, Store as StoreIcon, Heart } from 'lucide-react'
+import {
+  get, fetchStores, getProfile, getProfileDonations,
+  type ApiStore, type ApiCategory, type ApiProfile, type ApiDonation,
+} from '../../lib/api'
+import ScreenHeader from '../../components/app/ScreenHeader'
+import ProgressBar from '../../components/app/ProgressBar'
+import Chip from '../../components/app/Chip'
 
 export default function HomePage() {
-  const [params, setParams] = useSearchParams()
   const [loading, setLoading] = useState(true)
-  const [causes, setCauses] = useState<ApiCause[]>([])
-  const [featured, setFeatured] = useState<ApiCause[]>([])
   const [profile, setProfile] = useState<ApiProfile | null>(null)
-
-  const [search, setSearch] = useState(params.get('search') || '')
-  const [category, setCategory] = useState(params.get('category') || '')
+  const [donations, setDonations] = useState<ApiDonation[]>([])
+  const [stores, setStores] = useState<ApiStore[]>([])
+  const [categories, setCategories] = useState<ApiCategory[]>([])
+  const [search, setSearch] = useState('')
+  const [category, setCategory] = useState('')
 
   useEffect(() => {
     let cancelled = false
-    async function load() {
-      setLoading(true)
-      try {
-        const [feats, prof] = await Promise.all([fetchFeaturedCauses(), getProfile()])
-        if (cancelled) return
-        setFeatured(feats)
-        setProfile(prof)
+    Promise.all([
+      getProfile(),
+      getProfileDonations().catch(() => [] as ApiDonation[]),
+      get<ApiCategory[]>('/api/commerce/categories/'),
+    ]).then(([prof, dons, cats]) => {
+      if (cancelled) return
+      setProfile(prof); setDonations(dons); setCategories(cats)
+    }).catch((err) => console.error('Error cargando home:', err))
+    return () => { cancelled = true }
+  }, [])
 
-        const q = new URLSearchParams()
-        if (search) q.set('search', search)
-        if (category) q.set('category', category)
-        const list = await fetchCauses(q)
-        if (!cancelled) setCauses(list)
-      } catch (err) {
-        console.error('Error fetching home data:', err)
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    load()
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    const q = new URLSearchParams()
+    if (search) q.set('search', search)
+    if (category) q.set('category', category)
+    fetchStores(q)
+      .then((page) => { if (!cancelled) setStores(page.results) })
+      .catch((err) => console.error('Error cargando tiendas:', err))
+      .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [search, category])
 
-  useEffect(() => {
-    const next = new URLSearchParams()
-    if (search) next.set('search', search)
-    if (category) next.set('category', category)
-    setParams(next, { replace: true })
-  }, [search, category, setParams])
+  // Causa más apoyada (derivada del historial real) e impacto del mes
+  const { topCause, monthTotal } = useMemo(() => {
+    const byCause = new Map<string, number>()
+    let month = 0
+    const now = new Date()
+    for (const d of donations) {
+      const amt = parseFloat(d.amount) || 0
+      byCause.set(d.cause_title, (byCause.get(d.cause_title) || 0) + amt)
+      const dt = new Date(d.created_at)
+      if (dt.getFullYear() === now.getFullYear() && dt.getMonth() === now.getMonth()) month += amt
+    }
+    let top: string | null = null, topAmt = 0
+    byCause.forEach((amt, title) => { if (amt > topAmt) { top = title; topAmt = amt } })
+    return { topCause: top, monthTotal: month }
+  }, [donations])
 
-  const categories = useMemo(() => {
-    const seen = new Set<string>()
-    ;[...featured, ...causes].forEach((c) => { if (c.category) seen.add(c.category) })
-    return Array.from(seen)
-  }, [featured, causes])
-
-  const firstName = profile?.first_name || profile?.email?.split('@')[0] || 'Usuario'
-
-  if (loading) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-brand-blue-600 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-400 text-sm font-body">Cargando causas…</p>
-        </div>
-      </div>
-    )
-  }
+  const totalDonated = parseFloat(profile?.total_donated || '0')
+  const monthPct = totalDonated > 0 ? (monthTotal / totalDonated) * 100 : 0
+  const firstName = profile?.first_name || profile?.email?.split('@')[0] || ''
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Greeting bar */}
-      <div className="bg-white border-b border-gray-100">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-          <p className="text-xs text-gray-400 font-body uppercase tracking-wide mb-0.5">
-            Bienvenido/a de vuelta
-          </p>
-          <h1 className="text-2xl font-display font-bold text-brand-navy-900">
-            Hola, {firstName} 👋
-          </h1>
-        </div>
-      </div>
-
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-        {/* Impact banner */}
-        {profile && (
-          <div className="mb-8 rounded-3xl bg-gradient-to-r from-brand-navy-900 to-[#0F2E48] p-6 sm:p-8 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-            <div className="flex-1">
-              <p className="text-brand-lime-300 text-xs font-semibold uppercase tracking-widest font-body mb-2">
-                Tu impacto acumulado
-              </p>
-              <h2 className="text-xl sm:text-2xl font-display font-bold mb-5 leading-tight">
-                Cada compra suma para tus causas
-              </h2>
-              <div className="flex gap-8">
-                <div>
-                  <p className="text-3xl font-display font-bold text-brand-lime-300">
-                    ${parseFloat(profile.total_donated).toFixed(2)}
-                  </p>
-                  <p className="text-white/50 text-xs font-body mt-0.5">Donado</p>
-                </div>
-                <div>
-                  <p className="text-3xl font-display font-bold text-brand-lime-300">
-                    {profile.purchases_count}
-                  </p>
-                  <p className="text-white/50 text-xs font-body mt-0.5">Compras</p>
-                </div>
-                <div>
-                  <p className="text-3xl font-display font-bold text-brand-lime-300">
-                    {profile.causes_count}
-                  </p>
-                  <p className="text-white/50 text-xs font-body mt-0.5">Causas apoyadas</p>
-                </div>
-              </div>
-            </div>
-            <div className="hidden sm:flex w-28 h-28 rounded-3xl bg-white/5 border border-white/10 items-center justify-center flex-shrink-0">
-              <TrendingUp size={44} className="text-brand-lime-300" />
-            </div>
-          </div>
-        )}
-
-        {/* Destacadas */}
-        {featured.length > 0 && (
-          <div className="mb-10">
-            <h2 className="text-lg font-display font-bold text-brand-navy-900 mb-4">Causas destacadas</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {featured.slice(0, 3).map((cause) => (
-                <CauseCard key={cause.id} cause={cause} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Sección causas */}
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-display font-bold text-brand-navy-900">
-            Explorá las causas
-          </h2>
-          <span className="text-xs text-gray-400 font-body">
-            {causes.length} disponible{causes.length !== 1 ? 's' : ''}
-          </span>
-        </div>
-
-        {/* Search */}
-        <div className="relative mb-4">
+    <div>
+      <ScreenHeader
+        eyebrow={`Hola ${firstName} 👋${topCause ? ' · estás apoyando a' : ''}`}
+        title={topCause ? <>{topCause} 💚</> : '¿Dónde comprás hoy?'}
+      >
+        <div className="relative mt-3">
           <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Buscar por nombre o descripción…"
+            placeholder="Buscar comercios…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-body text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-blue-600/20 focus:border-brand-blue-600 transition-all"
+            className="w-full pl-10 pr-4 py-2.5 bg-white rounded-xl text-sm font-app text-gray-800
+                       placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-lime-400"
           />
         </div>
+      </ScreenHeader>
 
-        {/* Category pills */}
+      <div className="px-4 py-4 space-y-4">
+        {profile && (
+          <div className="rounded-2xl bg-gradient-to-r from-[#14532D] to-brand-green-700 text-white px-5 py-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-white/80">Tu impacto este mes</span>
+              <span className="text-lg font-extrabold">${monthTotal.toFixed(2)}</span>
+            </div>
+            <ProgressBar pct={monthPct} className="mt-2 bg-white/20" />
+            <p className="text-[11px] text-white/70 mt-1.5">
+              ${totalDonated.toFixed(2)} donados en total · {profile.causes_count} causa{profile.causes_count !== 1 ? 's' : ''}
+            </p>
+          </div>
+        )}
+
         {categories.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto pb-2 mb-7">
-            <FilterPill label="Todas" active={category === ''} onClick={() => setCategory('')} />
-            {categories.map((cat) => (
-              <FilterPill key={cat} label={cat} active={category === cat} onClick={() => setCategory(cat)} />
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            <Chip label="Todos" active={category === ''} onClick={() => setCategory('')} />
+            {categories.map((c) => (
+              <Chip key={c.id} label={c.name} active={category === c.slug} onClick={() => setCategory(c.slug)} />
             ))}
           </div>
         )}
 
-        {/* Grid */}
-        {causes.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Heart size={22} className="text-gray-300" />
-            </div>
-            <p className="text-gray-500 text-sm font-body">
-              No encontramos causas con ese criterio.
-            </p>
+        {loading ? (
+          <div className="space-y-3">
+            {[0, 1, 2].map((i) => <div key={i} className="h-28 rounded-2xl bg-gray-200/70 animate-pulse" />)}
+          </div>
+        ) : stores.length === 0 ? (
+          <div className="text-center py-16">
+            <StoreIcon size={36} className="text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500 text-sm">No encontramos comercios con ese criterio.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {causes.map((cause) => (
-              <CauseCard key={cause.id} cause={cause} />
-            ))}
+          <div className="space-y-3">
+            {stores.map((s) => <HomeStoreCard key={s.id} store={s} />)}
           </div>
         )}
       </div>
@@ -182,65 +125,40 @@ export default function HomePage() {
   )
 }
 
-/* ---- Sub-components ---- */
-
-function FilterPill({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+function HomeStoreCard({ store }: { store: ApiStore }) {
   return (
-    <button
-      onClick={onClick}
-      className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-body font-medium transition-all ${
-        active
-          ? 'bg-brand-navy-900 text-white shadow-sm'
-          : 'bg-white text-gray-500 border border-gray-200 hover:border-brand-navy-900 hover:text-brand-navy-900'
-      }`}
+    <Link
+      to={`/app/stores/${store.id}`}
+      className="block bg-white rounded-2xl overflow-hidden shadow-[0_1px_6px_rgba(10,34,54,0.08)]
+                 hover:shadow-md transition-shadow"
     >
-      {label}
-    </button>
+      <div className="h-20 bg-gradient-to-br from-brand-navy-900 to-brand-green-600 flex items-center justify-center">
+        {store.logo_url
+          ? <img src={store.logo_url} alt={store.display_name} className="h-12 w-12 rounded-xl object-cover" />
+          : <StoreIconFallback />}
+      </div>
+      <div className="px-4 py-3 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="font-app font-extrabold text-brand-navy-900 truncate">{store.display_name}</h3>
+          <p className="text-xs text-gray-400 truncate">
+            {[store.categories.map((c) => c.name).join(' · '), store.address].filter(Boolean).join(' — ')}
+          </p>
+        </div>
+        {store.supported_causes.length > 0 && (
+          <span className="flex-shrink-0 inline-flex items-center gap-1 bg-brand-green-50 text-brand-green-700
+                           text-xs font-bold px-2.5 py-1 rounded-lg">
+            <Heart size={11} className="fill-current" /> {store.supported_causes.length} causa{store.supported_causes.length !== 1 ? 's' : ''}
+          </span>
+        )}
+      </div>
+    </Link>
   )
 }
 
-function CauseCard({ cause }: { cause: ApiCause }) {
+function StoreIconFallback() {
   return (
-    <div className="group relative bg-white rounded-2xl overflow-hidden border border-gray-100 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5">
-      {cause.is_featured && (
-        <div className="absolute top-3 right-3 z-10">
-          <span className="bg-brand-blue-600 text-white text-[11px] font-semibold px-2.5 py-1 rounded-full font-body flex items-center gap-1">
-            <Heart size={9} className="fill-white" /> Destacada
-          </span>
-        </div>
-      )}
-
-      <div className="h-36 bg-gradient-to-br from-brand-blue-50 to-brand-sky-50 flex items-center justify-center overflow-hidden">
-        {cause.image_url ? (
-          <img src={cause.image_url} alt={cause.title} className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-14 h-14 rounded-2xl bg-brand-blue-600/10 flex items-center justify-center">
-            <Heart size={28} className="text-brand-blue-600" />
-          </div>
-        )}
-      </div>
-
-      <div className="p-5">
-        {cause.category && (
-          <span className="inline-block text-xs font-body font-medium text-brand-blue-600 bg-brand-blue-50 px-2.5 py-0.5 rounded-full mb-2">
-            {cause.category}
-          </span>
-        )}
-
-        <h3 className="font-display font-bold text-brand-navy-900 text-base mb-1 line-clamp-1">
-          {cause.title}
-        </h3>
-        <p className="text-brand-gray-500 text-sm font-body line-clamp-2 mb-4 leading-relaxed">
-          {cause.summary}
-        </p>
-
-        <Link
-          to={`/app/causes/${cause.slug}`}
-          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-brand-navy-900 text-white text-sm font-body font-semibold hover:bg-brand-blue-600 transition-colors"
-        >
-          Ver causa <ArrowRight size={13} />
-        </Link>
-      </div>
+    <div className="h-12 w-12 rounded-xl bg-white/15 flex items-center justify-center">
+      <StoreIcon size={22} className="text-white" />
     </div>
   )
 }
