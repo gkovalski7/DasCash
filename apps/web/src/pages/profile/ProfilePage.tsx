@@ -248,9 +248,16 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Role links */}
-        {(role === 'MERCHANT' || role === 'ADMIN') && (
-          <div className="space-y-2">
+        {/* Links section */}
+        <div className="space-y-2">
+          <Link
+            to="/app/purchases"
+            className="bg-white rounded-xl shadow-[0_1px_6px_rgba(10,34,54,0.08)] px-4 py-3 flex items-center justify-between hover:bg-brand-green-50 transition-colors"
+          >
+            <span className="font-bold text-brand-navy-900 text-sm">Mis compras</span>
+            <ChevronRight size={18} className="text-gray-400" />
+          </Link>
+          {(role === 'MERCHANT' || role === 'ADMIN') && (
             <Link
               to="/app/merchant/purchases"
               className="bg-white rounded-xl shadow-[0_1px_6px_rgba(10,34,54,0.08)] px-4 py-3 flex items-center justify-between hover:bg-brand-green-50 transition-colors"
@@ -258,17 +265,17 @@ export default function ProfilePage() {
               <span className="font-bold text-brand-navy-900 text-sm">Compras pendientes</span>
               <ChevronRight size={18} className="text-gray-400" />
             </Link>
-            {role === 'ADMIN' && (
-              <Link
-                to="/app/admin/merchants"
-                className="bg-white rounded-xl shadow-[0_1px_6px_rgba(10,34,54,0.08)] px-4 py-3 flex items-center justify-between hover:bg-brand-green-50 transition-colors"
-              >
-                <span className="font-bold text-brand-navy-900 text-sm">Panel admin</span>
-                <ChevronRight size={18} className="text-gray-400" />
-              </Link>
-            )}
-          </div>
-        )}
+          )}
+          {role === 'ADMIN' && (
+            <Link
+              to="/app/admin/merchants"
+              className="bg-white rounded-xl shadow-[0_1px_6px_rgba(10,34,54,0.08)] px-4 py-3 flex items-center justify-between hover:bg-brand-green-50 transition-colors"
+            >
+              <span className="font-bold text-brand-navy-900 text-sm">Panel admin</span>
+              <ChevronRight size={18} className="text-gray-400" />
+            </Link>
+          )}
+        </div>
 
         {/* Logout */}
         <button
