@@ -1,11 +1,14 @@
 import React, { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { post } from '../lib/api'
 import { setTokens, setUserEmail } from '../lib/auth'
 
 export default function LoginPage() {
     const navigate = useNavigate()
+    const location = useLocation()
+    // AppLayout guarda en state.from la ruta privada que disparó el login (ej: /app/pagar/:slug desde un QR)
+    const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [loading, setLoading] = useState(false)
@@ -23,7 +26,7 @@ export default function LoginPage() {
             setTokens({ access: data.access, refresh: data.refresh })
             setUserEmail(email)
             setSuccess(true)
-            navigate('/app/home', { replace: true })
+            navigate(from || '/app/home', { replace: true })
         } catch (err: any) {
             setError(err?.message || 'Error al iniciar sesión')
         } finally {
@@ -107,7 +110,7 @@ export default function LoginPage() {
                 <div className="mt-4 text-center">
                     <p className="text-sm text-gray-600">
                         ¿No tienes cuenta?{' '}
-                        <Link to="/signup" className="text-blue-600 hover:text-blue-500 font-medium">
+                        <Link to="/signup" state={location.state} className="text-blue-600 hover:text-blue-500 font-medium">
                             Crear cuenta
                         </Link>
                     </p>

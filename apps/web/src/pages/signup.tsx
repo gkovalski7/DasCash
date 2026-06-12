@@ -1,9 +1,11 @@
 import React, { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { post } from '../lib/api'
 
 export default function SignupPage() {
+    // Conserva state.from (ruta privada original, ej: pago QR) a través del ida y vuelta login ↔ signup
+    const location = useLocation()
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [confirm, setConfirm] = useState('')
@@ -109,7 +111,7 @@ export default function SignupPage() {
                 <div className="mt-6 text-center">
                     <p className="text-sm text-gray-600">
                         ¿Ya tienes cuenta?{' '}
-                        <Link to="/login" className="text-blue-600 hover:text-blue-500 font-medium">
+                        <Link to="/login" state={location.state} className="text-blue-600 hover:text-blue-500 font-medium">
                             Iniciar sesión
                         </Link>
                     </p>
