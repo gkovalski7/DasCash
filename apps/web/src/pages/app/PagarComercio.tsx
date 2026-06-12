@@ -117,15 +117,15 @@ export default function PagarComercio() {
 
   if (pageState === 'loading') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-brand-green-600 border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
 
   if (pageState === 'not_found') {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-6">
+      <div className="min-h-[calc(100vh-64px)] flex flex-col items-center justify-center px-6">
         <AlertCircle size={52} className="text-gray-300 mb-4" />
         <h2 className="text-xl font-semibold text-gray-800 mb-2">Comercio no encontrado</h2>
         <p className="text-gray-500 text-sm text-center mb-8">
@@ -133,7 +133,7 @@ export default function PagarComercio() {
         </p>
         <button
           onClick={() => navigate('/app/home')}
-          className="text-blue-600 font-semibold text-sm"
+          className="text-brand-green-700 font-semibold text-sm"
         >
           Volver al inicio
         </button>
@@ -154,14 +154,14 @@ export default function PagarComercio() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <div className="bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
+    <div className="min-h-[calc(100vh-64px)] flex flex-col">
+      <div className="bg-brand-green-600 border-b border-gray-100 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
         <button
           onClick={() => navigate(-1)}
-          className="p-2 -ml-2 rounded-full hover:bg-gray-100 transition-colors"
+          className="p-2 -ml-2 rounded-full hover:bg-white/10 transition-colors"
           aria-label="Volver"
         >
-          <ArrowLeft size={20} className="text-gray-600" />
+          <ArrowLeft size={20} className="text-white" />
         </button>
         <div className="flex items-center gap-2.5 flex-1 min-w-0">
           {store?.logo_url ? (
@@ -171,16 +171,16 @@ export default function PagarComercio() {
               className="w-9 h-9 rounded-xl object-cover flex-shrink-0"
             />
           ) : (
-            <div className="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-              <StoreIcon size={18} className="text-blue-600" />
+            <div className="w-9 h-9 bg-white/15 rounded-xl flex items-center justify-center flex-shrink-0">
+              <StoreIcon size={18} className="text-white" />
             </div>
           )}
           <div className="min-w-0">
-            <p className="font-semibold text-gray-900 text-sm truncate leading-tight">
+            <p className="font-semibold text-white text-sm truncate leading-tight">
               {store?.name}
             </p>
             {store?.address && (
-              <p className="text-gray-400 text-xs truncate">{store.address}</p>
+              <p className="text-white/70 text-xs truncate">{store.address}</p>
             )}
           </div>
         </div>
@@ -188,16 +188,16 @@ export default function PagarComercio() {
 
       <div className="flex-1 overflow-y-auto px-4 py-5 max-w-sm mx-auto w-full space-y-4">
         {store?.cashback_percentage && (
-          <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl px-5 py-4 text-white">
+          <div className="bg-gradient-to-br from-brand-navy-900 to-brand-green-700 rounded-2xl px-5 py-4 text-white">
             <div className="flex items-center gap-1.5 mb-1">
               <Sparkles size={14} className="text-yellow-300" />
-              <span className="text-xs font-semibold text-blue-200 uppercase tracking-wider">
+              <span className="text-xs font-semibold text-white/70 uppercase tracking-wider">
                 Cashback activo
               </span>
             </div>
             <div className="flex items-baseline gap-1">
               <span className="text-4xl font-black">{store.cashback_percentage}%</span>
-              <span className="text-blue-300 text-sm">de tu compra va al club</span>
+              <span className="text-brand-lime-300 text-sm">de tu compra va a tu causa 💚</span>
             </div>
           </div>
         )}
@@ -218,14 +218,14 @@ export default function PagarComercio() {
                 setAmount(e.target.value)
                 setErrorMsg('')
               }}
-              className="flex-1 text-4xl font-black text-gray-900 bg-transparent
+              className="flex-1 text-5xl font-black text-brand-navy-900 bg-transparent
                          border-none outline-none placeholder-gray-200 w-full"
             />
           </div>
           {cashbackPreview !== null && (
             <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
-              <span className="text-sm text-gray-400">Cashback para el club</span>
-              <span className="text-base font-bold text-emerald-600">
+              <span className="text-sm text-gray-400">Tu cashback dona</span>
+              <span className="text-base font-bold text-brand-green-700">
                 +${cashbackPreview.toFixed(2)}
               </span>
             </div>
@@ -245,7 +245,7 @@ export default function PagarComercio() {
                   className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl
                                border-2 transition-all text-left ${
                                  selectedCauseId === cause.id
-                                   ? 'border-blue-500 bg-blue-50'
+                                   ? 'border-brand-green-600 bg-brand-green-50'
                                    : 'border-gray-100 hover:border-gray-200 bg-white'
                                }`}
                 >
@@ -256,11 +256,11 @@ export default function PagarComercio() {
                       className="w-11 h-11 rounded-xl object-cover flex-shrink-0"
                     />
                   ) : (
-                    <div className="w-11 h-11 rounded-xl bg-blue-100 flex-shrink-0" />
+                    <div className="w-11 h-11 rounded-xl bg-brand-green-50 flex-shrink-0" />
                   )}
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm font-semibold truncate ${
-                      selectedCauseId === cause.id ? 'text-blue-700' : 'text-gray-900'
+                      selectedCauseId === cause.id ? 'text-brand-green-700' : 'text-gray-900'
                     }`}>
                       {cause.title}
                     </p>
@@ -269,7 +269,7 @@ export default function PagarComercio() {
                   <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center
                                    justify-center transition-colors ${
                                      selectedCauseId === cause.id
-                                       ? 'border-blue-500 bg-blue-500'
+                                       ? 'border-brand-green-600 bg-brand-green-600'
                                        : 'border-gray-200'
                                    }`}>
                     {selectedCauseId === cause.id && (
@@ -283,11 +283,11 @@ export default function PagarComercio() {
         )}
 
         {parsedAmount > 0 && selectedCause && cashbackPreview !== null && (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-5 py-4">
-            <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-2">
+          <div className="bg-brand-green-50 border border-brand-green-600/30 rounded-2xl px-5 py-4">
+            <p className="text-xs font-bold text-brand-green-700 uppercase tracking-wider mb-2">
               Con esta compra…
             </p>
-            <p className="text-sm text-emerald-800 leading-relaxed">
+            <p className="text-sm text-brand-green-700 leading-relaxed">
               <span className="font-bold">${cashbackPreview.toFixed(2)}</span>{' '}
               van directo a{' '}
               <span className="font-bold">{selectedCause.title}</span>.
@@ -306,7 +306,7 @@ export default function PagarComercio() {
         <button
           onClick={handlePagar}
           disabled={isProcessing || parsedAmount <= 0}
-          className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800
+          className="w-full bg-brand-green-600 hover:bg-brand-green-700 active:bg-brand-green-700
                      disabled:bg-gray-200 disabled:text-gray-400
                      text-white font-bold py-4 px-6 rounded-2xl transition-colors
                      text-base flex items-center justify-center gap-2"
@@ -328,6 +328,10 @@ export default function PagarComercio() {
         <p className="text-center text-xs text-gray-400 pb-2">
           Pagás con tu billetera habitual. El cashback se genera automáticamente
           al confirmar el pago.
+        </p>
+
+        <p className="text-center text-[11px] text-gray-400 flex items-center justify-center gap-1 pb-2">
+          🔒 Pago procesado por Mercado Pago
         </p>
       </div>
     </div>

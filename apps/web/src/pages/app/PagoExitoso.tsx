@@ -55,11 +55,11 @@ export default function PagoExitoso() {
               {isPending ? (
                 <Clock size={44} className="text-yellow-300" strokeWidth={1.5} />
               ) : (
-                <CheckCircle2 size={44} className="text-emerald-400" strokeWidth={1.5} />
+                <CheckCircle2 size={44} className="text-brand-lime-400" strokeWidth={1.5} />
               )}
             </div>
             {!isPending && (
-              <div className="absolute inset-0 rounded-full bg-emerald-400/20 animate-ping" />
+              <div className="absolute inset-0 rounded-full bg-brand-lime-400/20 animate-ping" />
             )}
           </div>
 
@@ -84,7 +84,7 @@ export default function PagoExitoso() {
             </div>
             <p className="text-white/70 text-sm">
               {isPending ? 'irán a' : 'fueron a'}{' '}
-              <span className="font-bold text-blue-300">{cause}</span>
+              <span className="font-bold text-brand-lime-300">{cause}</span>
             </p>
             {isPending && (
               <div className="mt-4 bg-yellow-400/10 border border-yellow-400/20 rounded-xl px-4 py-3">
@@ -101,11 +101,11 @@ export default function PagoExitoso() {
               onClick={() => navigate('/app/causes')}
               className="w-full bg-white text-[#0A2236] font-bold py-4 rounded-2xl
                          flex items-center justify-center gap-2
-                         hover:bg-blue-50 active:bg-blue-100 transition-colors"
+                         hover:bg-brand-green-50 active:bg-brand-green-50 transition-colors"
             >
-              <Heart size={18} className="text-blue-600" />
+              <Heart size={18} className="text-brand-green-600" />
               Ver mi impacto total
-              <ArrowRight size={18} className="text-blue-600" />
+              <ArrowRight size={18} className="text-brand-green-600" />
             </button>
             <button
               onClick={() => navigate('/app/scan')}

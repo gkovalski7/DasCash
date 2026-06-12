@@ -60,12 +60,12 @@ export default function ScanQR() {
         {screen === 'intro' && (
           <>
             <div className="relative mt-6 mb-8">
-              <div className="w-28 h-28 rounded-3xl bg-blue-600/20 border border-blue-400/30
+              <div className="w-28 h-28 rounded-3xl bg-brand-green-600/20 border border-brand-lime-400/30
                               flex items-center justify-center">
-                <QrCode size={52} className="text-blue-400" strokeWidth={1.5} />
+                <QrCode size={52} className="text-brand-lime-400" strokeWidth={1.5} />
               </div>
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-full h-0.5 bg-blue-400/60 animate-[scanLine_2s_ease-in-out_infinite]" />
+                <div className="w-full h-0.5 bg-brand-lime-400/60 animate-[scanLine_2s_ease-in-out_infinite]" />
               </div>
             </div>
 
@@ -79,7 +79,7 @@ export default function ScanQR() {
 
             <button
               onClick={() => setScreen('scanning')}
-              className="w-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700
+              className="w-full bg-brand-green-600 hover:bg-brand-green-700 active:bg-brand-green-700
                          text-white font-bold py-4 rounded-2xl transition-colors
                          flex items-center justify-center gap-2 text-base"
             >
@@ -119,7 +119,7 @@ export default function ScanQR() {
             <p className="text-white/50 text-sm leading-relaxed mb-8">{errorMsg}</p>
             <button
               onClick={() => setScreen('scanning')}
-              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold
+              className="w-full bg-brand-green-600 hover:bg-brand-green-700 text-white font-bold
                          py-4 rounded-2xl transition-colors mb-3"
             >
               Intentar de nuevo
