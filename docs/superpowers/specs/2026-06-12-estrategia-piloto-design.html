@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DasCash — Estrategia de implementación y flujo de dinero</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy-900: #0A2236;
+    --navy-800: #0F2E48;
+    --blue-600: #2E6CF6;
+    --blue-50:  #EEF4FF;
+    --gray-700: #1F2937;
+    --gray-500: #6B7280;
+    --lime-400: #A3E635;
+    --lime-300: #BEF264;
+    --green-600: #65A30D;
+    --green-700: #3F6212;
+    --green-50:  #F0FDF4;
+    --app-bg:   #F8FAF7;
+    --white:    #FFFFFF;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: var(--app-bg);
+    color: var(--gray-700);
+    line-height: 1.6;
+  }
+  .page { max-width: 860px; margin: 0 auto; padding: 0 24px 64px; }
+
+  header.hero {
+    background: var(--navy-900);
+    color: var(--white);
+    padding: 48px 24px 40px;
+    margin-bottom: 40px;
+    border-bottom: 4px solid var(--lime-400);
+  }
+  .hero-inner { max-width: 860px; margin: 0 auto; }
+  .hero .brand {
+    font-weight: 900; font-size: 1.1rem; letter-spacing: 0.08em;
+    color: var(--lime-400); text-transform: uppercase; margin-bottom: 12px;
+  }
+  .hero h1 { font-size: 2rem; font-weight: 800; line-height: 1.25; max-width: 640px; }
+  .hero .meta { margin-top: 16px; color: #B8C4CF; font-size: 0.95rem; }
+
+  h2 {
+    color: var(--navy-900); font-size: 1.45rem; font-weight: 800;
+    margin: 48px 0 8px; padding-top: 8px;
+  }
+  h2 .num {
+    display: inline-block; background: var(--lime-400); color: var(--navy-900);
+    border-radius: 8px; width: 34px; height: 34px; text-align: center;
+    line-height: 34px; font-size: 1.05rem; margin-right: 10px;
+  }
+  h3 { color: var(--navy-800); font-size: 1.05rem; font-weight: 800; margin: 24px 0 6px; }
+  p { margin: 10px 0; }
+  strong { color: var(--navy-900); }
+
+  .card {
+    background: var(--white); border: 1px solid #E5EAE3; border-radius: 14px;
+    padding: 20px 24px; margin: 16px 0;
+  }
+  .highlight {
+    background: var(--green-50); border-left: 4px solid var(--green-600);
+    border-radius: 0 12px 12px 0; padding: 14px 20px; margin: 18px 0;
+  }
+  .warn {
+    background: #FFFBEB; border-left: 4px solid #D97706;
+    border-radius: 0 12px 12px 0; padding: 14px 20px; margin: 18px 0;
+  }
+
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; background: var(--white); border-radius: 12px; overflow: hidden; }
+  th { background: var(--navy-900); color: var(--white); text-align: left; padding: 10px 14px; font-size: 0.9rem; }
+  td { padding: 10px 14px; border-bottom: 1px solid #ECF0EA; font-size: 0.95rem; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+
+  ul, ol { margin: 10px 0 10px 22px; }
+  li { margin: 6px 0; }
+
+  /* Diagrama de flujo */
+  .flow { text-align: center; margin: 24px 0; }
+  .flow .box {
+    display: inline-block; background: var(--white); border: 2px solid var(--navy-800);
+    border-radius: 12px; padding: 12px 22px; font-weight: 700; color: var(--navy-900);
+    min-width: 230px;
+  }
+  .flow .box small { display: block; font-weight: 600; color: var(--gray-500); margin-top: 2px; }
+  .flow .box.green { border-color: var(--green-600); background: var(--green-50); }
+  .flow .arrow { font-size: 1.4rem; color: var(--green-600); margin: 6px 0; font-weight: 800; }
+  .flow .split { display: flex; justify-content: center; gap: 28px; flex-wrap: wrap; margin-top: 6px; }
+  .flow .split-col { display: flex; flex-direction: column; align-items: center; }
+  .flow .pct {
+    font-weight: 900; color: var(--green-700); background: var(--lime-300);
+    border-radius: 999px; padding: 2px 14px; margin: 8px 0; font-size: 0.9rem;
+  }
+
+  .timeline { border-left: 3px solid var(--lime-400); margin: 20px 0 20px 8px; padding-left: 24px; }
+  .timeline .step { margin-bottom: 22px; position: relative; }
+  .timeline .step::before {
+    content: ''; position: absolute; left: -31px; top: 6px;
+    width: 13px; height: 13px; border-radius: 50%;
+    background: var(--green-600); border: 3px solid var(--app-bg);
+  }
+  .timeline .when { font-weight: 800; color: var(--green-700); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .timeline h3 { margin: 2px 0 6px; }
+
+  footer {
+    margin-top: 56px; padding-top: 20px; border-top: 3px solid;
+    border-image: linear-gradient(90deg, var(--blue-600), var(--lime-400)) 1;
+    color: var(--gray-500); font-size: 0.85rem;
+  }
+  @media print {
+    header.hero { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { background: var(--white); }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-inner">
+    <div class="brand">DasCash</div>
+    <h1>Estrategia de implementación: piloto, secuencia de ejecución y flujo de dinero</h1>
+    <div class="meta">Documento de diseño · 12 de junio de 2026 · Estado: aprobado para planificación</div>
+  </div>
+</header>
+
+<div class="page">
+
+  <section>
+    <h2>Resumen ejecutivo</h2>
+    <div class="card">
+      <p><strong>Qué es DasCash:</strong> cada compra en un comercio adherido genera una donación automática (3-6% del ticket, a cargo del comercio) a una causa que elige el cliente: el club del barrio, una escuela, un deportista. Al cliente no le cuesta nada extra; el comercio lo paga como costo de marketing que fideliza; la causa recibe ingresos recurrentes.</p>
+      <p><strong>Decisión estratégica («la causa vende»):</strong> los deportistas y los clubes son el motor de adquisición y credibilidad de la app. Por eso la secuencia es: cerrar <strong>una causa</strong> con comunidad activa → activar <strong>un comercio piloto</strong> → llevar números reales a <strong>instituciones</strong> (municipalidad, comité olímpico, FEDUA), que se siembran desde el día 1 pero no bloquean nada.</p>
+      <p><strong>Primer test:</strong> plata real, grupo cerrado de 20-50 personas reclutadas por el club, 3-4 semanas, un solo comercio.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">1</span>Diseño del piloto</h2>
+    <p><strong>Forma:</strong> una causa real (un club con comunidad activa y un referente deportivo que le ponga la cara), un comercio (supermercado de barrio con dueño conocido), y un grupo cerrado de 20-50 compradores reclutados por el propio club: socios, padres, jugadores. Pagos reales chicos durante 3-4 semanas.</p>
+
+    <h3>El guion replica la visión a escala</h3>
+    <p>La gente se registra <strong>en el club</strong>: una juntada de 15 minutos donde el referente presenta la app y todos se registran ahí mismo, con asistencia en vivo. Esto valida también el momento «registro comunitario». Después compran en el súper escaneando el QR de la caja: escanear → monto → pagar.</p>
+
+    <h3>Métricas de éxito (definidas antes de arrancar)</h3>
+    <table>
+      <tr><th>Métrica</th><th>Pregunta que responde</th></tr>
+      <tr><td>% de registrados que compran al menos 1 vez</td><td>¿El club realmente moviliza?</td></tr>
+      <tr><td>% que escanea y completa el pago</td><td>¿La caja tiene fricción? (métrica clave)</td></tr>
+      <tr><td>Compras por persona en el mes</td><td>¿Hay recurrencia o es compromiso de una sola vez?</td></tr>
+      <tr><td>Tiempo de pago en caja vs. QR común de MP</td><td>¿El comerciante lo tolera en hora pico?</td></tr>
+      <tr><td>$ donado acumulado</td><td>El número que después se muestra a instituciones</td></tr>
+    </table>
+
+    <h3>Rol de cada actor durante el test</h3>
+    <ul>
+      <li><strong>Comercio:</strong> no paga nada (el % del piloto lo cubre el fundador, o se arranca con un % simbólico). Recibe reporte semanal de movimiento.</li>
+      <li><strong>Club:</strong> difunde, organiza la juntada de registro, y al cierre del mes recibe la liquidación a mano — transferencia con comprobante compartido al grupo. Esa transparencia artesanal es el marketing.</li>
+      <li><strong>Compradores:</strong> usan la app en compras cotidianas reales. Se entrevista tanto a los que compraron como a los que se registraron y no compraron.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="num">2</span>Secuencia de ejecución</h2>
+    <p>Tres frentes en paralelo asimétrico: <strong>~70% piloto, ~20% instituciones, ~10% producto.</strong> El piloto manda; lo institucional se siembra sin bloquear nada.</p>
+
+    <div class="timeline">
+      <div class="step">
+        <div class="when">Semanas 1-2 · Preparación</div>
+        <h3>Cerrar causa, comercio y bloqueantes técnicos</h3>
+        <ul>
+          <li>Charla con el club/deportista (contacto más caliente). Se sale con fecha para la juntada de registro.</li>
+          <li>Pitch al comercio, reforzado: «ya hay un club con 40 personas listas para comprarte».</li>
+          <li>Producto: hosting público (único bloqueante técnico) + «causa preferida» para que en caja sea solo escanear → monto → pagar.</li>
+        </ul>
+      </div>
+      <div class="step">
+        <div class="when">Semanas 3-6 · Piloto corriendo</div>
+        <h3>Observar, no programar</h3>
+        <ul>
+          <li>Juntada de registro en el club, QR en la caja, arranca el mes de medición.</li>
+          <li>Sin features nuevas salvo que algo rompa el piloto. Entrevistas a usuarios y no-usuarios.</li>
+          <li>Siembra institucional: 2-3 cafés con contactos directos en modo «te cuento lo que estoy armando, en un mes te traigo números». Sin pedir nada todavía.</li>
+          <li>En paralelo: iniciar el trámite de MP Marketplace (Fase 2).</li>
+        </ul>
+      </div>
+      <div class="step">
+        <div class="when">Semanas 7-8 · Cierre y apalancamiento</div>
+        <h3>Liquidar, informar, volver con números</h3>
+        <ul>
+          <li>Liquidación a mano al club + comprobante al grupo + mini-informe de una página con las métricas.</li>
+          <li>Segunda ronda institucional con el informe: el pedido concreto es difusión + apertura de comercios en lote (cámaras de comercio, centros comerciales a cielo abierto).</li>
+          <li>Decisión de escala: más causas y comercios, y con qué respaldo.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">3</span>Flujo de dinero</h2>
+    <p>Dos horizontes que cuentan la misma historia; solo cambia quién mueve la plata.</p>
+
+    <h3>En régimen — split automático de Mercado Pago (Fase 2)</h3>
+    <div class="card flow">
+      <div class="box">Compra de $1.000 en la caja<small>Cliente escanea QR DasCash y paga con Mercado Pago</small></div>
+      <div class="arrow">↓</div>
+      <div class="box green">SPLIT AUTOMÁTICO<small>Mercado Pago Marketplace, en el acto</small></div>
+      <div class="split">
+        <div class="split-col">
+          <div class="pct">95%</div>
+          <div class="box">COMERCIO<small>$950 en su cuenta MP, al instante</small></div>
+        </div>
+        <div class="split-col">
+          <div class="pct">5%</div>
+          <div class="box green">CUENTA SOLIDARIA DasCash<small>Acumula por causa · saldo visible en la app</small></div>
+          <div class="arrow">↓ una vez por mes</div>
+          <div class="box green">LIQUIDACIÓN A CAUSAS<small>1 transferencia por causa + comprobante público</small></div>
+        </div>
+      </div>
+    </div>
+
+    <h3>Los cuatro principios del diseño</h3>
+    <ol>
+      <li><strong>El cliente nunca paga de más.</strong> Paga $1.000 como siempre; el porcentaje solidario sale del lado del comercio (su costo de marketing). Es la clave de la baja fricción.</li>
+      <li><strong>DasCash nunca toca la plata de la venta.</strong> El 95% va directo del cliente al comercio vía Mercado Pago. Solo la parte solidaria pasa por la cuenta de DasCash: la plataforma administra donaciones, no procesa pagos (sin regulación BCRA de procesador, sin capital de trabajo).</li>
+      <li><strong>Concentrar y liquidar mensual.</strong> Una transferencia por causa en fecha fija (ej. el 5 de cada mes) con comprobante publicado. El «día de liquidación» es un evento comunicable: el club anuncia cuánto juntó. Retiro anticipado disponible a pedido con un fee chico (ej. 2%) — diseñado desde el día 1, se construye cuando alguna causa lo pida.</li>
+      <li><strong>El 100% de lo donado llega a la causa.</strong> La comisión de la plataforma no sale de la donación: se cobra al comercio aparte. Ejemplo: el comercio aporta 6% total → 5 puntos van íntegros a la causa, 1 punto es ingreso de DasCash. La narrativa «cada peso donado llega» responde sola la objeción de confianza.</li>
+    </ol>
+
+    <h3>Modelo de ingresos</h3>
+    <div class="highlight">
+      <p><strong>A quién se le cobra:</strong> al comercio (punto extra sobre el porcentaje solidario + más adelante suscripción mensual cuando el valor esté probado). <strong>A quién no:</strong> a clubes y deportistas, gratis siempre — son la fuerza de ventas y la credibilidad de la red. La analogía con PedidosYa se sostiene justamente porque PedidosYa le cobra al restaurante (el comercio), no al cliente ni al repartidor.</p>
+    </div>
+
+    <h3>Durante el piloto — Fase 1 (lo ya construido)</h3>
+    <p>El pago va 100% al comercio; la app registra cada donación; al cierre del mes el fundador transfiere a mano al club y publica el comprobante. El split automático se construye en paralelo y se estrena al escalar. Mensaje para presentaciones: <em>«el piloto valida el comportamiento; la automatización del split es la fase siguiente y ya está planificada sobre MP Marketplace».</em></p>
+  </section>
+
+  <section>
+    <h2><span class="num">4</span>Riesgos y mitigaciones</h2>
+    <table>
+      <tr><th>Riesgo</th><th>Mitigación</th></tr>
+      <tr><td>El club difunde pero la gente no compra</td><td>Juntada de registro presencial (no un link por WhatsApp) + referente que pone la cara. Si igual no compran, el piloto lo dice con números en 4 semanas — eso también es un resultado.</td></tr>
+      <tr><td>Fricción en caja en hora pico</td><td>«Causa preferida» preconfigurada: escanear → monto → pagar. Se mide el tiempo contra el QR común de MP; si supera ~15-20 segundos extra, es lo primero a arreglar.</td></tr>
+      <tr><td>El comerciante se enfría a mitad del piloto</td><td>El % del piloto lo cubre el fundador (riesgo cero real) + reporte semanal de ventas vía app.</td></tr>
+      <tr><td>Confianza en la plata («¿llega de verdad?»)</td><td>Comprobante de transferencia publicado al grupo + saldo de la causa visible en la app en tiempo real.</td></tr>
+      <tr><td>Aprobación de MP Marketplace demora (Fase 2)</td><td>No bloquea: el piloto corre en Fase 1. El trámite se inicia en paralelo durante las semanas 3-6.</td></tr>
+      <tr><td>Tiempos políticos institucionales</td><td>Por diseño: las instituciones se siembran pero ningún hito del piloto depende de ellas.</td></tr>
+    </table>
+
+    <div class="warn">
+      <p><strong>Honestidad comercial (regla del piloto):</strong> no prometer transferencia automática a las causas. Decir: «durante el piloto, la liquidación a la causa la gestiono yo manualmente». Es verdad y deja cubierto al proyecto.</p>
+    </div>
+  </section>
+
+  <footer>
+    DasCash · Documento de diseño estratégico · 2026-06-12 · Generado durante sesión de brainstorming — base para el plan de implementación y para presentaciones externas.
+  </footer>
+
+</div>
+</body>
+</html>
