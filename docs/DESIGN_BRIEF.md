@@ -23,6 +23,8 @@ El rediseño puede tocar libremente componentes, layouts y estilos — no requie
 
 ## 3. Identidad visual actual
 
+> **Actualización 2026-06: la app privada usa la identidad "Verde impacto"** (navy `#0A2236` + verde `#65A30D`, tipografía Nunito, BottomNav con FAB QR, shell centrado de 480px). Ver spec en `docs/superpowers/specs/2026-06-12-rediseno-verde-impacto-design.md`. El sitio público conserva la identidad azul descripta abajo.
+
 ### Paleta (`tailwind.config.js` + `src/styles/tokens.css`)
 
 | Token | Hex | Uso actual |
