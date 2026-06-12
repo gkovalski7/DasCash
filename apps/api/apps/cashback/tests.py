@@ -900,3 +900,24 @@ class PaymentLearnsPreferredCauseTests(BaseTestCase):
         self.assertEqual(res.status_code, 201)
         self.consumer.refresh_from_db()
         self.assertEqual(self.consumer.preferred_cause_id, self.cause_b.id)
+
+    @patch("apps.cashback.payment_views.MercadoPagoService")
+    def test_initiate_cambia_la_preferida_existente(self, mock_mp):
+        mock_mp.return_value.create_checkout_preference.return_value = {
+            "preference_id": "pref-test-3",
+            "checkout_url": "https://mp.test/checkout/pref-test-3",
+        }
+        self.consumer.preferred_cause = self.cause_b
+        self.consumer.save(update_fields=["preferred_cause"])
+        res = self.client.post(
+            "/api/cashback/payments/initiate/",
+            {
+                "store_slug": self.store.qrcode_slug,
+                "amount": 800,
+                "selected_cause_id": self.cause_a.id,
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, 201)
+        self.consumer.refresh_from_db()
+        self.assertEqual(self.consumer.preferred_cause_id, self.cause_a.id)
