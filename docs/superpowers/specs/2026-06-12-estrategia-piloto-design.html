@@ -107,6 +107,28 @@
   .timeline .when { font-weight: 800; color: var(--green-700); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; }
   .timeline h3 { margin: 2px 0 6px; }
 
+  /* Galería de pantallas */
+  .shot-landing {
+    width: 100%; border-radius: 14px; border: 1px solid #E5EAE3;
+    box-shadow: 0 6px 24px rgba(10,34,54,0.12); display: block; margin: 18px 0;
+  }
+  .gallery { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; margin: 24px 0; }
+  .phone { width: 235px; text-align: center; }
+  .phone .frame {
+    border: 6px solid var(--navy-900); border-radius: 26px; overflow: hidden;
+    box-shadow: 0 8px 28px rgba(10,34,54,0.18); background: var(--navy-900);
+  }
+  .phone img { width: 100%; display: block; }
+  .phone .frame.crop { aspect-ratio: 430 / 750; }
+  .phone .frame.crop img { height: 100%; object-fit: cover; object-position: top; }
+  .phone .step-tag {
+    display: inline-block; background: var(--lime-400); color: var(--navy-900);
+    font-weight: 900; border-radius: 999px; padding: 2px 14px; font-size: 0.85rem;
+    margin: 12px 0 4px;
+  }
+  .phone .cap { font-size: 0.88rem; color: var(--gray-500); line-height: 1.45; margin-top: 4px; }
+  .phone .cap strong { color: var(--navy-900); }
+
   footer {
     margin-top: 56px; padding-top: 20px; border-top: 3px solid;
     border-image: linear-gradient(90deg, var(--blue-600), var(--lime-400)) 1;
@@ -136,6 +158,34 @@
       <p><strong>Qué es DasCash:</strong> cada compra en un comercio adherido genera una donación automática (3-6% del ticket, a cargo del comercio) a una causa que elige el cliente: el club del barrio, una escuela, un deportista. Al cliente no le cuesta nada extra; el comercio lo paga como costo de marketing que fideliza; la causa recibe ingresos recurrentes.</p>
       <p><strong>Decisión estratégica («la causa vende»):</strong> los deportistas y los clubes son el motor de adquisición y credibilidad de la app. Por eso la secuencia es: cerrar <strong>una causa</strong> con comunidad activa → activar <strong>un comercio piloto</strong> → llevar números reales a <strong>instituciones</strong> (municipalidad, comité olímpico, FEDUA), que se siembran desde el día 1 pero no bloquean nada.</p>
       <p><strong>Primer test:</strong> plata real, grupo cerrado de 20-50 personas reclutadas por el club, 3-4 semanas, un solo comercio.</p>
+    </div>
+    <img class="shot-landing" src="assets/landing.png" alt="Landing de DasCash: Comprás como siempre. Ayudás a la causa que elegís.">
+  </section>
+
+  <section>
+    <h2>El circuito del usuario, en pantallas reales</h2>
+    <p>Capturas de la app funcionando hoy. El circuito completo: conocer la plataforma y registrarse (en casa o en el club), pagar en la caja, y ver el impacto al instante.</p>
+    <div class="gallery">
+      <div class="phone">
+        <div class="frame"><img src="assets/home.png" alt="Home de la app: tu impacto este mes y comercios adheridos"></div>
+        <span class="step-tag">1</span>
+        <div class="cap"><strong>Se registra una sola vez</strong> (en su casa o en la juntada del club) y elige su causa. El home le muestra su impacto y los comercios adheridos.</div>
+      </div>
+      <div class="phone">
+        <div class="frame"><img src="assets/pagar.png" alt="Pantalla de pago: monto, causa elegida y botón Pagar con Mercado Pago"></div>
+        <span class="step-tag">2</span>
+        <div class="cap"><strong>En la caja:</strong> escanea el QR impreso, pone el monto y paga con Mercado Pago. La app le muestra cuánto dona esa compra, sin costo extra.</div>
+      </div>
+      <div class="phone">
+        <div class="frame crop"><img src="assets/causas.png" alt="Pantalla Impacto: total donado y últimas donaciones por causa"></div>
+        <span class="step-tag">3</span>
+        <div class="cap"><strong>El impacto, al instante:</strong> cuánto donó en total, a qué causa, compra por compra. Esta transparencia responde sola la pregunta «¿la plata llega?».</div>
+      </div>
+      <div class="phone">
+        <div class="frame crop"><img src="assets/perfil.png" alt="Perfil del usuario: total donado, compras y donaciones por causa"></div>
+        <span class="step-tag">4</span>
+        <div class="cap"><strong>El historial acumulado:</strong> total donado, compras y actividad reciente. Es el reporte que también ven el club y el comercio, cada uno desde su lado.</div>
+      </div>
     </div>
   </section>
 
