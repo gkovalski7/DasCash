@@ -1,4 +1,5 @@
 import logging
+from django.conf import settings
 from django.db import transaction as db_transaction
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -12,7 +13,7 @@ from rest_framework import status
 from apps.commerce.models import Store
 from apps.causes.models import Cause
 from .models import Purchase, CashbackTransaction, MPPaymentData
-from .mp_service import MercadoPagoService
+from .mp_service import MercadoPagoService, validate_webhook_signature
 from .qr_service import generate_store_qr_base64, get_store_payment_url
 
 logger = logging.getLogger(__name__)
@@ -225,6 +226,26 @@ class MPWebhookView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        secret = getattr(settings, "MP_WEBHOOK_SECRET", "")
+        if not secret:
+            if not settings.DEBUG:
+                logger.error(
+                    "MP_WEBHOOK_SECRET no configurado — webhook rechazado (fail closed)."
+                )
+                return Response(
+                    {"detail": "Webhook no configurado."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            logger.warning(
+                "MP_WEBHOOK_SECRET no configurado — webhook sin validar (solo DEBUG)."
+            )
+        elif not validate_webhook_signature(request, secret):
+            logger.warning("Webhook MP con firma inválida o ausente — rechazado.")
+            return Response(
+                {"detail": "Firma inválida."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         notification_type = request.data.get("type")
 
         if notification_type != "payment":

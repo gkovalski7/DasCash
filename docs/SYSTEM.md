@@ -1,8 +1,10 @@
 # Documentación Técnica del Sistema — DasCash
 
-**Versión:** 1.1  
-**Fecha:** 2026-06-10  
-**Estado del sistema:** Funcional para uso interno + flujo QR/Mercado Pago Fase 1 (demo municipio)
+**Versión:** 1.2  
+**Fecha:** 2026-06-11  
+**Estado del sistema:** Funcional para uso interno + flujo QR/Mercado Pago Fase 1 (demo municipio). Listo para deploy salvo elección de hosting.
+
+> **Novedades v1.2:** validación de firma `x-signature` en el webhook de Mercado Pago (fail closed en producción), ordering estable en listados paginados (purchases por `-created_at`, stores por `display_name`), `pytest.ini` (pytest vuelve a descubrir los tests), y stack completo de producción: `infra/docker-compose.prod.yml` (gunicorn + nginx + build de Vite), `infra/nginx/dascash.conf`, `infra/.env.prod.example` y flags de seguridad Django activados con `DEBUG=0`.
 
 > **Novedades v1.1:** paginación en stores/purchases, recuperación de contraseña por email, refresh automático de JWT en el frontend, guards de rol en rutas admin/merchant, CRUD completo (update/delete) para merchants/stores/campaigns/causes, y flujo de pago QR + Mercado Pago Checkout Pro con webhook y cashback automático.
 
@@ -317,7 +319,7 @@ Cause
 | POST                 | `/api/cashback/purchases/{id}/approve/` | MERCHANT/ADMIN | Aprobar compra → genera cashback |
 | GET                  | `/api/cashback/transactions/`           | Autenticado    | Listar transacciones de cashback |
 | POST                 | `/api/cashback/payments/initiate/`      | CONSUMER       | Crear Purchase + preference de Mercado Pago → devuelve `checkout_url`        |
-| POST                 | `/api/cashback/webhooks/mercadopago/`   | Público (MP)   | Webhook de MP: aprueba la compra y genera cashback automáticamente           |
+| POST                 | `/api/cashback/webhooks/mercadopago/`   | Público (MP)   | Webhook de MP: valida firma `x-signature` (HMAC, `MP_WEBHOOK_SECRET`), aprueba la compra y genera cashback. Sin secret configurado: rechaza en producción, permite solo en DEBUG |
 
 #### Causes (`/api/causes/`)
 
@@ -401,10 +403,10 @@ Cobertura de tests existente:
 | Módulo     | Tests cubiertos                                                                                 |
 | ---------- | ----------------------------------------------------------------------------------------------- |
 | `accounts` | GET/PATCH `/api/profile/`, GET `/api/profile/donations/`, autenticación                         |
-| `cashback` | Aprobación de compras, deduplicación de cashback, validación de status, ownership, campañas     |
-| `commerce` | `StoreSupportedCause` CRUD, restricciones de ownership, causas inactivas, validación de compras |
+| `cashback` | Aprobación de compras, deduplicación de cashback, validación de status, ownership, campañas, firma del webhook MP, ordering de listados |
+| `commerce` | `StoreSupportedCause` CRUD, restricciones de ownership, causas inactivas, validación de compras, ordering de stores |
 
-**Ejecución:** `pytest` desde `apps/api/`.
+**Ejecución:** `pytest` o `python manage.py test` desde `apps/api/` (87 tests). En Docker: `docker compose -f infra/docker-compose.yml run --rm --no-deps api pytest` (con el servicio `db` levantado).
 
 ---
 
@@ -590,6 +592,7 @@ DEFAULT_FROM_EMAIL=DasCash <noreply@dascash.com>
 
 # Mercado Pago (flujo QR — Fase 1)
 MP_ACCESS_TOKEN=<TEST-... o APP_USR-...>
+MP_WEBHOOK_SECRET=<clave secreta del panel MP — obligatoria en producción>
 MP_SANDBOX=true
 BACKEND_BASE_URL=http://localhost:8000
 FRONTEND_BASE_URL=http://localhost:5173
@@ -662,13 +665,15 @@ VITE_API_URL=http://localhost:8000
 
 | Área                      | Descripción                                                                          | Prioridad |
 | ------------------------- | ------------------------------------------------------------------------------------ | --------- |
-| Settings UI               | Pantalla `/app/settings` es placeholder                                              | Media     |
-| Paginación                | Falta en merchants, campaigns, causes y transactions (stores y purchases ya la tienen) | Media   |
-| ReceiptUpload             | Modelo existe, sin endpoint ni UI                                                    | Baja      |
-| Notificaciones            | Sin emails/push de compra aprobada o cashback generado                               | Media     |
+| Hosting                   | Elegir proveedor y apuntar DNS de dascash.com.ar — el stack prod ya está armado      | Alta      |
 | MP Marketplace (Fase 2)   | Split automático de fondos 95/5 — hoy el dinero va 100% al comercio y el cashback es virtual | Alta |
-| Firma de webhook MP       | El webhook de Mercado Pago no valida firma (`x-signature`)                           | Alta      |
-| Nginx proxy               | Carpeta `infra/nginx/` reservada pero sin configurar                                 | Media     |
+| Settings UI               | Pantalla `/app/settings` es placeholder                                              | Media     |
+| Paginación                | Falta en merchants, campaigns, causes y transactions (stores y purchases ya la tienen, con ordering estable) | Media |
+| Notificaciones            | Sin emails/push de compra aprobada o cashback generado                               | Media     |
+| PWA                       | manifest + service worker + push (decisión: PWA antes que app nativa)                | Media     |
+| ReceiptUpload             | Modelo existe, sin endpoint ni UI                                                    | Baja      |
+
+_(Resuelto en v1.2: firma de webhook MP validada con tests; nginx configurado en `infra/nginx/dascash.conf`; compose de producción con gunicorn.)_
 
 ---
 
@@ -678,13 +683,10 @@ VITE_API_URL=http://localhost:8000
 
 | Severidad | Hallazgo                                                              | Recomendación                                 |
 | --------- | --------------------------------------------------------------------- | --------------------------------------------- |
-| Alta      | `DJANGO_SECRET_KEY` tiene default `insecure-secret` en docker-compose | Obligar variable sin default en producción    |
-| Alta      | `DJANGO_DEBUG=1` por default en docker-compose                        | Cambiar a `0` en producción                   |
-| Alta      | Webhook de Mercado Pago sin validación de firma (`x-signature`)       | Validar firma HMAC antes de procesar el pago  |
 | Media     | Tokens JWT almacenados en `localStorage` (vulnerable a XSS)           | Evaluar httpOnly cookies para refresh token   |
-| Baja      | `POSTGRES_PASSWORD` con default en docker-compose                     | Sin default en producción                     |
 
-_(Resuelto desde v1.0: refresh automático del access token — implementado con interceptor de 401 y cola compartida en `lib/api.ts`.)_
+_(Resuelto desde v1.0: refresh automático del access token — interceptor de 401 con cola compartida en `lib/api.ts`.)_
+_(Resuelto en v1.2: firma del webhook MP validada (HMAC `x-signature`, fail closed sin secret en producción); los defaults inseguros de `DJANGO_SECRET_KEY`, `DJANGO_DEBUG` y `POSTGRES_PASSWORD` solo aplican al compose de desarrollo — `docker-compose.prod.yml` exige las variables sin default y fija `DEBUG=0`.)_
 
 ### Arquitectura y calidad de código
 

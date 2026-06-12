@@ -1,0 +1,84 @@
+# DasCash — stack de producción
+#
+# Uso (desde la raíz del repo, con infra/.env.prod completo):
+#   docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod up --build -d
+#
+# Diferencias vs. dev:
+#  - Sin defaults inseguros: las variables sensibles son OBLIGATORIAS (falla si faltan).
+#  - api corre con gunicorn (no runserver), DEBUG=0, sin seeds, sin código montado.
+#  - web es el build estático de Vite servido por nginx, que además proxya /api y /admin.
+#  - La base de datos no expone puertos al host.
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Definir POSTGRES_USER en infra/.env.prod}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Definir POSTGRES_PASSWORD en infra/.env.prod}
+      POSTGRES_DB: ${POSTGRES_DB:?Definir POSTGRES_DB en infra/.env.prod}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  api:
+    build: ../apps/api
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Definir DJANGO_SECRET_KEY en infra/.env.prod}
+      DJANGO_DEBUG: "0"
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-dascash.com.ar,www.dascash.com.ar}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://dascash.com.ar,https://www.dascash.com.ar}
+      LOAD_SEEDS: "false"
+      FRONTEND_URL: ${FRONTEND_URL:-https://dascash.com.ar}
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}
+      EMAIL_HOST: ${EMAIL_HOST:-smtp.gmail.com}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_USE_TLS: ${EMAIL_USE_TLS:-1}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-DasCash <noreply@dascash.com.ar>}
+      MP_ACCESS_TOKEN: ${MP_ACCESS_TOKEN:?Definir MP_ACCESS_TOKEN en infra/.env.prod}
+      MP_WEBHOOK_SECRET: ${MP_WEBHOOK_SECRET:?Definir MP_WEBHOOK_SECRET en infra/.env.prod}
+      MP_SANDBOX: ${MP_SANDBOX:-false}
+      BACKEND_BASE_URL: ${BACKEND_BASE_URL:-https://dascash.com.ar}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-https://dascash.com.ar}
+      SECURE_SSL_REDIRECT: ${SECURE_SSL_REDIRECT:-0}
+      SECURE_HSTS_SECONDS: ${SECURE_HSTS_SECONDS:-0}
+    expose:
+      - "8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: /bin/sh -c "python manage.py migrate --noinput && python manage.py collectstatic --noinput && gunicorn core.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 60"
+    volumes:
+      - static_files:/app/staticfiles
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../apps/web
+      dockerfile: Dockerfile.prod
+      args:
+        # Vacío = la SPA llama a la API same-origin (nginx proxya /api)
+        VITE_API_URL: ${VITE_API_URL:-}
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/dascash.conf:/etc/nginx/conf.d/default.conf:ro
+      - static_files:/staticfiles:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  static_files:

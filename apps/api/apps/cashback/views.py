@@ -36,7 +36,11 @@ class CampaignViewSet(viewsets.ModelViewSet):
 
 
 class PurchaseViewSet(viewsets.ModelViewSet):
-    queryset = Purchase.objects.select_related("store", "selected_cause").all()
+    queryset = (
+        Purchase.objects.select_related("store", "selected_cause")
+        .all()
+        .order_by("-created_at", "-id")
+    )
     serializer_class = PurchaseSerializer
     pagination_class = StandardPagination
 

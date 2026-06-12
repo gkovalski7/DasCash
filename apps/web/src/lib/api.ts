@@ -1,7 +1,8 @@
 import { env } from './env'
 import { getAccessToken, getTokens, setTokens, clearTokens } from './auth'
 
-const baseURL = env.apiUrl || 'http://localhost:8000'
+// '' (string vacío) es válido: en producción la API se sirve same-origin detrás de nginx
+const baseURL = env.apiUrl ?? 'http://localhost:8000'
 
 function extractErrorMessage(data: any, fallback: string): string {
   if (!data) return fallback

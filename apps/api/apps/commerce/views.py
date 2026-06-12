@@ -58,7 +58,11 @@ class MerchantViewSet(viewsets.ModelViewSet):
 
 
 class StoreViewSet(viewsets.ModelViewSet):
-    queryset = Store.objects.all().prefetch_related("categories", "supported_causes__cause")
+    queryset = (
+        Store.objects.all()
+        .prefetch_related("categories", "supported_causes__cause")
+        .order_by("display_name", "id")
+    )
     serializer_class = StoreSerializer
     pagination_class = StandardPagination
 

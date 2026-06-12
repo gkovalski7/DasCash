@@ -16,6 +16,10 @@ apps/web/.vite
 # Env
 .env
 **/.env
+infra/.env.prod
+
+# Django collectstatic
+apps/api/staticfiles
 
 # Build caches
 *.tsbuildinfo

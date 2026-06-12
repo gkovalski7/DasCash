@@ -87,6 +87,25 @@ Se crea también 1 store y 1 campaign activa para el merchant.
 
 - Frontend: `npm run dev`, `npm run build`, `npm run preview`, `npm run lint`, `npm run format`
 - Backend: `python manage.py runserver`, `python manage.py migrate`, `python manage.py runseeds`
+- Tests backend: `python manage.py test` o `pytest` (desde `apps/api/`)
+
+## Despliegue a producción (dascash.com.ar)
+
+Todo el stack de producción está en `infra/docker-compose.prod.yml` (gunicorn + build estático de Vite + nginx como proxy). Lo único que falta decidir es **dónde hostearlo** (VPS, Railway, etc.).
+
+```bash
+# 1. Configurar variables (una sola vez)
+cp infra/.env.prod.example infra/.env.prod
+#    → completar DJANGO_SECRET_KEY, POSTGRES_PASSWORD, MP_ACCESS_TOKEN, MP_WEBHOOK_SECRET
+
+# 2. Levantar
+docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod up --build -d
+```
+
+- nginx escucha en el puerto 80: sirve la SPA y proxya `/api` y `/admin` a Django.
+- El webhook de Mercado Pago valida la firma `x-signature` — `MP_WEBHOOK_SECRET` es obligatorio (sale del panel de MP → Webhooks → Clave secreta).
+- HTTPS: ver instrucciones en `infra/nginx/dascash.conf` (certbot en VPS, o TLS del hosting).
+- Apuntar el DNS de `dascash.com.ar` (registro A) a la IP del servidor.
 
 ## Próximos pasos (Sprint 1)
 

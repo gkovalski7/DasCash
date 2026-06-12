@@ -4,10 +4,13 @@ Covers: A (status bypass), B (approve flow), D (inactive cause),
         E (ownership), F (campaign ownership), SC (selected_cause validation).
 """
 
+import hashlib
+import hmac
 from decimal import Decimal
 from datetime import timedelta
+from unittest.mock import patch
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
@@ -728,3 +731,130 @@ class TestCauseCRUD(BaseTestCase):
             "category": "Salud",
         }, format="json")
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# O. Ordering estable en listados paginados
+# ═══════════════════════════════════════════════════════════════════════════
+class TestPurchaseListOrdering(BaseTestCase):
+
+    def test_purchases_listed_newest_first(self):
+        """O.1: GET /api/cashback/purchases/ devuelve las compras más recientes primero."""
+        older = Purchase.objects.create(
+            user=self.consumer, store=self.store, amount=Decimal("100"), source="QR"
+        )
+        newer = Purchase.objects.create(
+            user=self.consumer, store=self.store, amount=Decimal("200"), source="QR"
+        )
+        client = self._client_for(self.consumer)
+        resp = client.get("/api/cashback/purchases/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        ids = [p["id"] for p in resp.data["results"]]
+        self.assertEqual(ids[:2], [newer.pk, older.pk])
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# W. MP Webhook — validación de firma x-signature
+# ═══════════════════════════════════════════════════════════════════════════
+WEBHOOK_SECRET = "test-mp-webhook-secret"
+
+
+class TestMPWebhookSignature(BaseTestCase):
+    """El webhook de MP debe validar la firma HMAC del header x-signature."""
+
+    URL = "/api/cashback/webhooks/mercadopago/"
+
+    def _signed_headers(self, data_id, secret=WEBHOOK_SECRET,
+                        ts="1704908010", request_id="req-abc-123"):
+        manifest = f"id:{data_id};request-id:{request_id};ts:{ts};"
+        v1 = hmac.new(secret.encode(), manifest.encode(), hashlib.sha256).hexdigest()
+        return {
+            "HTTP_X_SIGNATURE": f"ts={ts},v1={v1}",
+            "HTTP_X_REQUEST_ID": request_id,
+        }
+
+    def _post_webhook(self, data_id, headers=None):
+        client = APIClient()
+        return client.post(
+            f"{self.URL}?data.id={data_id}&type=payment",
+            {"type": "payment", "data": {"id": data_id}},
+            format="json",
+            **(headers or {}),
+        )
+
+    def _approved_payment_mock(self, mock_service_cls, purchase, mp_payment_id):
+        instance = mock_service_cls.return_value
+        instance.get_payment_details.return_value = {
+            "status": "approved",
+            "status_detail": "accredited",
+            "external_reference": str(purchase.id),
+            "transaction_amount": float(purchase.amount),
+        }
+        return instance
+
+    @override_settings(MP_WEBHOOK_SECRET=WEBHOOK_SECRET)
+    @patch("apps.cashback.payment_views.MercadoPagoService")
+    def test_valid_signature_processes_payment(self, mock_service_cls):
+        """W.1: firma válida → 200, la compra se aprueba y genera cashback."""
+        purchase = Purchase.objects.create(
+            user=self.consumer, store=self.store, amount=Decimal("1000"),
+            source="QR", status="PENDING", selected_cause=self.cause_a,
+        )
+        self._approved_payment_mock(mock_service_cls, purchase, "999111")
+
+        resp = self._post_webhook("999111", self._signed_headers("999111"))
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        purchase.refresh_from_db()
+        self.assertEqual(purchase.status, "APPROVED")
+        self.assertEqual(purchase.cashbacktransaction_set.count(), 1)
+
+    @override_settings(MP_WEBHOOK_SECRET=WEBHOOK_SECRET)
+    @patch("apps.cashback.payment_views.MercadoPagoService")
+    def test_invalid_signature_rejected(self, mock_service_cls):
+        """W.2: firma con secret incorrecto → 403 y la compra no se toca."""
+        purchase = Purchase.objects.create(
+            user=self.consumer, store=self.store, amount=Decimal("1000"),
+            source="QR", status="PENDING",
+        )
+        self._approved_payment_mock(mock_service_cls, purchase, "999222")
+
+        headers = self._signed_headers("999222", secret="otro-secret")
+        resp = self._post_webhook("999222", headers)
+
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+        purchase.refresh_from_db()
+        self.assertEqual(purchase.status, "PENDING")
+        mock_service_cls.return_value.get_payment_details.assert_not_called()
+
+    @override_settings(MP_WEBHOOK_SECRET=WEBHOOK_SECRET)
+    @patch("apps.cashback.payment_views.MercadoPagoService")
+    def test_missing_signature_header_rejected(self, mock_service_cls):
+        """W.3: request sin header x-signature → 403."""
+        resp = self._post_webhook("999333", headers=None)
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+        mock_service_cls.return_value.get_payment_details.assert_not_called()
+
+    @override_settings(MP_WEBHOOK_SECRET="", DEBUG=False)
+    @patch("apps.cashback.payment_views.MercadoPagoService")
+    def test_no_secret_in_production_rejected(self, mock_service_cls):
+        """W.4: sin secret configurado en producción → 403 (fail closed)."""
+        resp = self._post_webhook("999444", self._signed_headers("999444"))
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+        mock_service_cls.return_value.get_payment_details.assert_not_called()
+
+    @override_settings(MP_WEBHOOK_SECRET="", DEBUG=True)
+    @patch("apps.cashback.payment_views.MercadoPagoService")
+    def test_no_secret_in_debug_allows(self, mock_service_cls):
+        """W.5: sin secret en DEBUG → se procesa (solo para desarrollo local)."""
+        purchase = Purchase.objects.create(
+            user=self.consumer, store=self.store, amount=Decimal("500"),
+            source="QR", status="PENDING",
+        )
+        self._approved_payment_mock(mock_service_cls, purchase, "999555")
+
+        resp = self._post_webhook("999555", headers=None)
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        purchase.refresh_from_db()
+        self.assertEqual(purchase.status, "APPROVED")

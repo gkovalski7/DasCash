@@ -1,8 +1,48 @@
+import hashlib
+import hmac
 import logging
+
 import mercadopago
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
+
+
+def validate_webhook_signature(request, secret: str) -> bool:
+    """Valida el header x-signature de un webhook de Mercado Pago.
+
+    Esquema oficial de MP: x-signature = "ts=<ts>,v1=<hmac>", donde v1 es
+    HMAC-SHA256(secret, manifest) en hex y el manifest es
+    "id:<data.id>;request-id:<x-request-id>;ts:<ts>;" (las secciones sin
+    valor se omiten; data.id alfanumérico se compara en minúsculas).
+    """
+    signature = request.headers.get("x-signature", "")
+    if not signature:
+        return False
+
+    parts = {}
+    for item in signature.split(","):
+        key, _, value = item.partition("=")
+        parts[key.strip()] = value.strip()
+    ts = parts.get("ts")
+    v1 = parts.get("v1")
+    if not ts or not v1:
+        return False
+
+    data_id = request.query_params.get("data.id", "")
+    if data_id and data_id.isalnum():
+        data_id = data_id.lower()
+    request_id = request.headers.get("x-request-id", "")
+
+    manifest = ""
+    if data_id:
+        manifest += f"id:{data_id};"
+    if request_id:
+        manifest += f"request-id:{request_id};"
+    manifest += f"ts:{ts};"
+
+    expected = hmac.new(secret.encode(), manifest.encode(), hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, v1)
 
 
 class MercadoPagoService:

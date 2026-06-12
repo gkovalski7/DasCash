@@ -215,6 +215,26 @@ class TestAddStoreCause(StoreCauseBaseTestCase):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# S7b. Stable ordering in paginated store list
+# ═══════════════════════════════════════════════════════════════════════════
+class TestStoreListOrdering(StoreCauseBaseTestCase):
+
+    def test_stores_listed_alphabetically(self):
+        """S7b: GET /api/commerce/stores/ orders stores by display_name."""
+        Store.objects.create(
+            merchant=self.merchant, display_name="ZZZ Store", qrcode_slug="zzz-1", active=True
+        )
+        Store.objects.create(
+            merchant=self.merchant, display_name="AAA Store", qrcode_slug="aaa-1", active=True
+        )
+        client = self._client_for(self.consumer)
+        resp = client.get("/api/commerce/stores/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        names = [s["display_name"] for s in resp.data["results"]]
+        self.assertEqual(names, sorted(names))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # S8. StoreSerializer includes supported_causes
 # ═══════════════════════════════════════════════════════════════════════════
 class TestStoreSerializerEnrichment(StoreCauseBaseTestCase):
@@ -228,7 +248,9 @@ class TestStoreSerializerEnrichment(StoreCauseBaseTestCase):
         resp = client.get("/api/commerce/stores/")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
 
-        store_data = next(s for s in resp.data if s["id"] == self.store.pk)
+        store_data = next(
+            s for s in resp.data["results"] if s["id"] == self.store.pk
+        )
         self.assertIn("supported_causes", store_data)
         self.assertEqual(len(store_data["supported_causes"]), 2)
 
