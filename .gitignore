@@ -29,6 +29,7 @@ db.sqlite3
 
 # Claude Code (config personal)
 .claude/settings.local.json
+.superpowers/
 
 # OS
 .DS_Store
