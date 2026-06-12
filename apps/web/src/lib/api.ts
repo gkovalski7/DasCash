@@ -206,6 +206,8 @@ export type ApiProfile = {
   first_name: string
   last_name: string
   role: string
+  preferred_cause: number | null
+  preferred_cause_title: string | null
   total_donated: string
   causes_count: number
   purchases_count: number
@@ -215,7 +217,9 @@ export function getProfile(): Promise<ApiProfile> {
   return get<ApiProfile>('/api/profile/')
 }
 
-export function patchProfile(data: Partial<Pick<ApiProfile, 'username' | 'first_name' | 'last_name'>>): Promise<ApiProfile> {
+export function patchProfile(
+  data: Partial<Pick<ApiProfile, 'username' | 'first_name' | 'last_name' | 'preferred_cause'>>
+): Promise<ApiProfile> {
   return patch<ApiProfile>('/api/profile/', data)
 }
 
