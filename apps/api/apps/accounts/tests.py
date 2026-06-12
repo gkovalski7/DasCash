@@ -240,6 +240,7 @@ class RegisterPreferredCauseTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.cause = Cause.objects.create(title="Club Registro", category="Deporte", is_active=True)
+        cls.cause_inactive = Cause.objects.create(title="Inactiva Registro", category="Salud", is_active=False)
 
     def setUp(self):
         self.client = APIClient()
@@ -262,3 +263,12 @@ class RegisterPreferredCauseTests(TestCase):
         )
         self.assertIn(res.status_code, (200, 201))
         self.assertIsNone(User.objects.get(email="n2@t.com").preferred_cause)
+
+    def test_registro_rechaza_causa_inactiva(self):
+        res = self.client.post(
+            "/api/auth/register",
+            {"email": "n3@t.com", "password": "Pass1234!", "preferred_cause": self.cause_inactive.id},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 400)
+        self.assertFalse(User.objects.filter(email="n3@t.com").exists())
