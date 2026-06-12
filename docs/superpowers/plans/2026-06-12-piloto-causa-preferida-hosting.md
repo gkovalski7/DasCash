@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Dejar DasCash listo para el piloto: el flujo en caja queda en escanear → monto → pagar (causa preferida preseleccionada) y la app corre en una URL pública HTTPS en un VPS, con webhook de Mercado Pago operativo.
+**Goal:** Dejar DasCash listo para el piloto: el flujo en caja queda en escanear → monto → pagar (causa preferida preseleccionada) y la app corre en https://dascash.com.ar en un VPS, con webhook de Mercado Pago operativo.
 
-**Architecture:** Fase A agrega `preferred_cause` al usuario (FK a Cause), se setea en el registro o se aprende automáticamente al iniciar un pago, y el frontend la preselecciona en la pantalla de pago. Fase B empaqueta producción: gunicorn + whitenoise para la API, build estático de Vite servido por Caddy (mismo dominio, sin CORS), todo en un `docker-compose.prod.yml` para el VPS.
+**Architecture:** Fase A agrega `preferred_cause` al usuario (FK a Cause), se setea en el registro o se aprende automáticamente al iniciar un pago, y el frontend la preselecciona en la pantalla de pago. Fase B completa el stack de producción **ya existente y smoke-testeado** (v1.2: `infra/docker-compose.prod.yml` con gunicorn + nginx + build de Vite, `infra/nginx/dascash.conf`, `infra/.env.prod.example`, dominio dascash.com.ar ya en propiedad): solo falta TLS (certbot webroot) y el deploy real al VPS.
 
-**Tech Stack:** Django 5/DRF + pytest-django, React/Vite + vitest/testing-library, Docker Compose, Caddy 2 (SSL automático), Mercado Pago Checkout Pro.
+**Tech Stack:** Django 5/DRF + pytest-django, React/Vite + vitest/testing-library, Docker Compose, nginx + certbot (Let's Encrypt), Mercado Pago Checkout Pro.
 
 **Spec:** `docs/superpowers/specs/2026-06-12-estrategia-piloto-design.html`
 
@@ -252,7 +252,7 @@ git commit -m "feat(api): registro acepta causa preferida"
 
 - [ ] **Step 1: Write the failing test**
 
-Agregar al final de `apps/api/apps/cashback/tests.py` (el archivo ya tiene `BaseTestCase` con `consumer`, `store` con slug `ts-1`, `cause_a`, y ya importa `patch`, `APIClient`):
+Agregar al final de `apps/api/apps/cashback/tests.py` (el archivo ya tiene `BaseTestCase` con `consumer`, `store` con slug `ts-1`, `cause_a`, y ya importa `patch` y `APIClient`):
 
 ```python
 class PaymentLearnsPreferredCauseTests(BaseTestCase):
@@ -635,7 +635,7 @@ Expected: 3 PASS.
 - [ ] **Step 5: Run the full web suite (login.test.tsx usa SignupPage — verificar que no se rompa)**
 
 Run: `docker compose -f infra/docker-compose.yml run --rm web npm test`
-Expected: todo PASS. (Nota: `login.test.tsx` renderiza SignupPage sin mockear `fetchCauses` — el mock de ese archivo solo define `post`. Si falla con "fetchCauses is not a function", agregar `fetchCauses: vi.fn().mockResolvedValue([])` al `vi.mock('../lib/api', ...)` de `login.test.tsx`.)
+Expected: todo PASS. (Nota: `login.test.tsx` renderiza SignupPage y su `vi.mock('../lib/api', ...)` solo define `post`. Si falla con "fetchCauses is not a function", agregar `fetchCauses: vi.fn().mockResolvedValue([])` a ese mock.)
 
 - [ ] **Step 6: Commit**
 
@@ -646,316 +646,206 @@ git commit -m "feat(web): registro con seleccion opcional de causa preferida"
 
 ---
 
-## Fase B — Hosting en VPS
+## Fase B — Hosting en VPS (dascash.com.ar)
 
-### Task 6: API lista para producción — whitenoise para estáticos del admin
+> **Contexto:** el stack de producción ya existe desde v1.2 y fue smoke-testeado localmente: `infra/docker-compose.prod.yml` (gunicorn 3 workers, DEBUG=0, sin seeds, estáticos por volumen compartido), `apps/web/Dockerfile.prod` (build Vite → nginx), `infra/nginx/dascash.conf` (SPA + proxy /api /admin /static) y `infra/.env.prod.example` (vars obligatorias con `:?`). El dominio **dascash.com.ar ya es de German**. Lo que falta: TLS con certbot (el conf lo anticipa en su header) y el deploy real.
 
-**Files:**
-- Modify: `apps/api/requirements.txt`
-- Modify: `apps/api/core/settings.py`
-
-- [ ] **Step 1: Agregar dependencia**
-
-En `apps/api/requirements.txt`, después de `gunicorn>=22.0`:
-
-```
-whitenoise>=6.7
-```
-
-- [ ] **Step 2: Configurar middleware y storage**
-
-En `apps/api/core/settings.py`:
-
-1. En `MIDDLEWARE`, insertar como segundo elemento (inmediatamente después de `"django.middleware.security.SecurityMiddleware"`):
-
-```python
-    "whitenoise.middleware.WhiteNoiseMiddleware",
-```
-
-2. Después de la línea `STATIC_ROOT = BASE_DIR / "staticfiles"`:
-
-```python
-STORAGES = {
-    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
-    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
-}
-```
-
-- [ ] **Step 3: Rebuild y verificar collectstatic + suite**
-
-Run:
-```bash
-docker compose -f infra/docker-compose.yml build api
-docker compose -f infra/docker-compose.yml run --rm api sh -c "python manage.py collectstatic --noinput && pytest -q"
-```
-Expected: `X static files copied to '/app/staticfiles'` y la suite PASS.
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add apps/api/requirements.txt apps/api/core/settings.py
-git commit -m "feat(api): whitenoise para servir estaticos del admin en produccion"
-```
-
----
-
-### Task 7: Build de producción del frontend + Caddy
+### Task 6: TLS — certbot webroot + configuración nginx para 443
 
 **Files:**
-- Create: `apps/web/Dockerfile.prod`
-- Create: `infra/Caddyfile`
+- Modify: `infra/docker-compose.prod.yml`
+- Modify: `infra/nginx/dascash.conf`
+- Create: `infra/nginx/dascash-ssl.conf`
+- Modify: `infra/.env.prod.example`
 
-- [ ] **Step 1: Dockerfile de producción del web**
+- [ ] **Step 1: Agregar el challenge ACME al conf HTTP existente**
 
-Crear `apps/web/Dockerfile.prod`:
+En `infra/nginx/dascash.conf`, dentro del `server { ... }`, antes de `location / {`:
 
-```dockerfile
-# Build estático de la SPA + Caddy como server y reverse proxy
-FROM node:20-alpine AS build
-WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm ci --omit=optional || npm install --omit=optional
-COPY . .
-# VITE_API_URL="" → la SPA llama a la API same-origin (Caddy la proxea)
-ARG VITE_API_URL=""
-ENV VITE_API_URL=$VITE_API_URL
-RUN npm run build
-
-FROM caddy:2-alpine
-COPY --from=build /app/dist /srv
+```nginx
+    # Challenge ACME de Let's Encrypt (certbot webroot)
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
 ```
 
-- [ ] **Step 2: Caddyfile**
+- [ ] **Step 2: Crear el conf HTTPS (se activa por env var DESPUÉS de emitir el certificado)**
 
-Crear `infra/Caddyfile`:
+Crear `infra/nginx/dascash-ssl.conf`:
 
+```nginx
+# DasCash — nginx producción con TLS (dascash.com.ar)
+# Activar vía NGINX_CONF=dascash-ssl.conf en infra/.env.prod, SOLO después de
+# emitir el certificado (Task 8, Step 5). Si nginx no encuentra los .pem, no arranca.
+
+server {
+    listen 80;
+    server_name dascash.com.ar www.dascash.com.ar;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name dascash.com.ar www.dascash.com.ar;
+
+    ssl_certificate /etc/letsencrypt/live/dascash.com.ar/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/dascash.com.ar/privkey.pem;
+
+    client_max_body_size 10M;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /assets/ {
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
+    }
+
+    location /api/ {
+        proxy_pass http://api:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /admin/ {
+        proxy_pass http://api:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /static/ {
+        alias /staticfiles/;
+        expires 7d;
+        add_header Cache-Control "public";
+    }
+}
 ```
-{$SITE_ADDRESS}
 
-encode gzip
+- [ ] **Step 3: Compose — puerto 443, volúmenes de certbot y servicio de renovación**
 
-handle /api/* {
-	reverse_proxy api:8000
-}
-
-handle /admin/* {
-	reverse_proxy api:8000
-}
-
-handle /static/* {
-	reverse_proxy api:8000
-}
-
-handle {
-	root * /srv
-	try_files {path} /index.html
-	file_server
-}
-```
-
-(Con `SITE_ADDRESS=midominio.com` Caddy emite el certificado HTTPS automáticamente vía Let's Encrypt; con `SITE_ADDRESS=:80` sirve HTTP plano para smoke test local.)
-
-**Nota:** `env.apiUrl` (en `apps/web/src/lib/env.ts`) lee `VITE_API_URL`; el comentario en `apps/web/src/lib/api.ts:4` ya documenta que `''` significa same-origin. No hay que tocar código del frontend.
-
-- [ ] **Step 3: Verificar que el build compila**
-
-Run: `docker build -f apps/web/Dockerfile.prod -t dascash-web-prod apps/web`
-Expected: build exitoso (tsc + vite build sin errores).
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add apps/web/Dockerfile.prod infra/Caddyfile
-git commit -m "feat(infra): build estatico del web + Caddy con SSL automatico"
-```
-
----
-
-### Task 8: docker-compose de producción + plantilla de variables
-
-**Files:**
-- Create: `infra/docker-compose.prod.yml`
-- Create: `infra/.env.prod.example`
-- Modify: `.gitignore` (ignorar `infra/.env.prod`)
-
-- [ ] **Step 1: Compose de producción**
-
-Crear `infra/docker-compose.prod.yml`:
+En `infra/docker-compose.prod.yml`, servicio `web`: cambiar `ports` y `volumes` a:
 
 ```yaml
-services:
-  db:
-    image: postgres:16
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    volumes:
-      - db_data_prod:/var/lib/postgresql/data
-
-  api:
-    build: ../apps/api
-    restart: unless-stopped
-    environment:
-      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
-      DJANGO_DEBUG: "0"
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_HOST: db
-      POSTGRES_PORT: 5432
-      ALLOWED_HOSTS: ${DOMAIN},api,localhost
-      CORS_ALLOWED_ORIGINS: https://${DOMAIN}
-      LOAD_SEEDS: "false"
-      EMAIL_BACKEND: ${EMAIL_BACKEND}
-      EMAIL_HOST_USER: ${EMAIL_HOST_USER}
-      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD}
-      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL}
-      MP_ACCESS_TOKEN: ${MP_ACCESS_TOKEN}
-      MP_WEBHOOK_SECRET: ${MP_WEBHOOK_SECRET}
-      MP_SANDBOX: ${MP_SANDBOX}
-      BACKEND_BASE_URL: ${PUBLIC_URL}
-      FRONTEND_BASE_URL: ${PUBLIC_URL}
-      FRONTEND_URL: ${PUBLIC_URL}
-      SECURE_SSL_REDIRECT: "0"
-    depends_on:
-      db:
-        condition: service_healthy
-    command: >
-      sh -c "python manage.py migrate &&
-             python manage.py collectstatic --noinput &&
-             gunicorn core.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 60"
-
-  web:
-    build:
-      context: ../apps/web
-      dockerfile: Dockerfile.prod
-    restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
-    environment:
-      SITE_ADDRESS: ${SITE_ADDRESS}
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - api
-
-volumes:
-  db_data_prod:
-  caddy_data:
-  caddy_config:
+      - ./nginx/${NGINX_CONF:-dascash.conf}:/etc/nginx/conf.d/default.conf:ro
+      - static_files:/staticfiles:ro
+      - certbot_certs:/etc/letsencrypt:ro
+      - certbot_webroot:/var/www/certbot:ro
 ```
 
-(`SECURE_SSL_REDIRECT: "0"` porque Caddy ya redirige http→https; activarlo en Django causaría loop detrás del proxy.)
+Agregar el servicio `certbot` (después de `web`):
 
-- [ ] **Step 2: Plantilla de variables**
+```yaml
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - certbot_certs:/etc/letsencrypt
+      - certbot_webroot:/var/www/certbot
+    # Renovación automática cada 12 h (no hace nada si no hay certs aún).
+    entrypoint: /bin/sh -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"
+    restart: unless-stopped
+```
 
-Crear `infra/.env.prod.example`:
+Y en `volumes:` al final del archivo, agregar:
+
+```yaml
+  certbot_certs:
+  certbot_webroot:
+```
+
+- [ ] **Step 4: Documentar NGINX_CONF en el env example**
+
+En `infra/.env.prod.example`, al final de la sección "Dominio":
 
 ```bash
-# ── Dominio ──────────────────────────────────────────────
-# DOMAIN: hostname público (sin protocolo). SITE_ADDRESS: lo que escucha Caddy.
-# Producción: DOMAIN=app.midominio.com.ar / SITE_ADDRESS=app.midominio.com.ar / PUBLIC_URL=https://app.midominio.com.ar
-# Smoke local:  DOMAIN=localhost / SITE_ADDRESS=:80 / PUBLIC_URL=http://localhost
-DOMAIN=app.midominio.com.ar
-SITE_ADDRESS=app.midominio.com.ar
-PUBLIC_URL=https://app.midominio.com.ar
-
-# ── Django ───────────────────────────────────────────────
-# Generar con: python -c "import secrets; print(secrets.token_urlsafe(50))"
-DJANGO_SECRET_KEY=cambiame
-
-# ── Postgres ─────────────────────────────────────────────
-POSTGRES_USER=cashback
-POSTGRES_PASSWORD=cambiame
-POSTGRES_DB=cashback
-
-# ── Mercado Pago ─────────────────────────────────────────
-# Producción: credenciales de la aplicación MP en modo producción (APP_USR-...)
-MP_ACCESS_TOKEN=
-MP_WEBHOOK_SECRET=
-MP_SANDBOX=false
-
-# ── Email (opcional durante el piloto) ───────────────────
-EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
-EMAIL_HOST_USER=
-EMAIL_HOST_PASSWORD=
-DEFAULT_FROM_EMAIL=DasCash <noreply@dascash.com>
+# Config de nginx: dascash.conf (HTTP, para el primer arranque y smoke local)
+# o dascash-ssl.conf (HTTPS — activar SOLO después de emitir el certificado, ver plan Task 8)
+NGINX_CONF=dascash.conf
 ```
 
-- [ ] **Step 3: Ignorar el .env real**
+- [ ] **Step 5: Validar sintaxis del compose**
 
-En `.gitignore` (raíz del repo), agregar la línea:
-
+Run:
+```bash
+cp infra/.env.prod.example /tmp/envcheck && sed -i 's/^DJANGO_SECRET_KEY=$/DJANGO_SECRET_KEY=x/;s/^POSTGRES_PASSWORD=$/POSTGRES_PASSWORD=x/;s/^MP_ACCESS_TOKEN=$/MP_ACCESS_TOKEN=x/;s/^MP_WEBHOOK_SECRET=$/MP_WEBHOOK_SECRET=x/' /tmp/envcheck
+docker compose -f infra/docker-compose.prod.yml --env-file /tmp/envcheck config --quiet
 ```
-infra/.env.prod
-```
+Expected: exit 0, sin errores.
 
-- [ ] **Step 4: Validar la sintaxis del compose**
-
-Run: `docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod.example config --quiet`
-Expected: sin errores (exit 0).
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add infra/docker-compose.prod.yml infra/.env.prod.example .gitignore
-git commit -m "feat(infra): stack de produccion (gunicorn + caddy) para VPS"
+git add infra/
+git commit -m "feat(infra): TLS con certbot webroot para el stack de produccion"
 ```
 
 ---
 
-### Task 9: Smoke test local del stack de producción
+### Task 7: Smoke local del stack de producción (re-verificación tras los cambios de TLS)
 
-**Files:**
-- Create: `infra/.env.prod` (local, NO se commitea)
+**Files:** ninguno nuevo (usa `infra/.env.prod` local, que ya está en .gitignore).
 
-- [ ] **Step 1: Crear env local de prueba**
+- [ ] **Step 1: Crear env local de smoke**
 
 ```bash
 cp infra/.env.prod.example infra/.env.prod
 ```
 
-Editar `infra/.env.prod` con valores de smoke local:
+Editar `infra/.env.prod` con valores locales:
 
 ```bash
-DOMAIN=localhost
-SITE_ADDRESS=:80
-PUBLIC_URL=http://localhost
 DJANGO_SECRET_KEY=solo-para-smoke-local
 POSTGRES_PASSWORD=smoke-local
-MP_ACCESS_TOKEN=TEST-xxx   # el token de test de MP que ya usás en dev
+MP_ACCESS_TOKEN=TEST-xxx        # el token de test que ya usás en dev
+MP_WEBHOOK_SECRET=smoke-secret
 MP_SANDBOX=true
+ALLOWED_HOSTS=localhost,127.0.0.1
+CORS_ALLOWED_ORIGINS=http://localhost
+FRONTEND_URL=http://localhost
+BACKEND_BASE_URL=http://localhost
+FRONTEND_BASE_URL=http://localhost
+NGINX_CONF=dascash.conf
 ```
 
-- [ ] **Step 2: Bajar el stack de dev (libera el puerto 5432/8000) y levantar prod**
+- [ ] **Step 2: Bajar dev y levantar prod**
 
 ```bash
 docker compose -f infra/docker-compose.yml down
 docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod up -d --build
 ```
 
-Expected: 3 contenedores arriba (db, api, web).
+Expected: 4 contenedores arriba (db, api, web, certbot). El log de certbot puede decir "no renewals were attempted" — correcto.
 
 - [ ] **Step 3: Smoke checks**
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}" http://localhost/            # → 200 (SPA)
-curl -s http://localhost/api/causes/                                # → [] (JSON vacío, LOAD_SEEDS=false)
+curl -s -o /dev/null -w "%{http_code}" http://localhost/             # → 200 (SPA)
+curl -s http://localhost/api/causes/                                 # → [] (JSON, LOAD_SEEDS=false)
 curl -s -o /dev/null -w "%{http_code}" http://localhost/admin/login/ # → 200 (admin con CSS)
-curl -s -o /dev/null -w "%{http_code}" http://localhost/app/home     # → 200 (SPA fallback try_files)
+curl -s -o /dev/null -w "%{http_code}" http://localhost/app/home     # → 200 (SPA fallback)
 ```
 
-Expected: los códigos indicados. Si `/admin/login/` devuelve 500, revisar que `collectstatic` haya corrido (logs del contenedor api).
+Expected: los códigos indicados.
 
 - [ ] **Step 4: Bajar el stack prod local**
 
@@ -963,7 +853,7 @@ Expected: los códigos indicados. Si `/admin/login/` devuelve 500, revisar que `
 docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod down
 ```
 
-- [ ] **Step 5: Commit (solo si hubo fixes de los pasos anteriores)**
+- [ ] **Step 5: Commit (solo si hubo fixes)**
 
 ```bash
 git add -A
@@ -972,81 +862,94 @@ git commit -m "fix(infra): ajustes del stack de produccion tras smoke local"
 
 ---
 
-### Task 10: Deploy al VPS — checklist operativo
+### Task 8: Deploy al VPS — checklist operativo (manual, German)
 
-**Files:** ninguno en el repo (operaciones en el VPS y paneles externos). Pasos manuales de German, en orden:
+**Files:** ninguno en el repo (operaciones en el VPS y paneles externos). En orden:
 
-- [ ] **Step 1: Contratar VPS y dominio**
+- [ ] **Step 1: Contratar el VPS**
 
-- VPS: Ubuntu 24.04, mínimo 2 GB RAM / 1 vCPU. Proveedores en pesos: DonWeb Cloud, Hostinger (paga en ARS con tarjeta local). Anotar la IP pública.
-- Dominio: registrar (`.com.ar` vía nic.ar con clave fiscal, o un `.com`). Crear registro DNS **A**: `app.midominio.com.ar → IP del VPS`. Esperar propagación (verificar con `nslookup app.midominio.com.ar`).
+Ubuntu 24.04, mínimo 2 GB RAM / 1 vCPU. Proveedores en pesos: DonWeb Cloud, Hostinger (pagan en ARS con tarjeta local). Anotar la IP pública.
 
-- [ ] **Step 2: Preparar el VPS**
+- [ ] **Step 2: Apuntar el dominio (ya en propiedad)**
+
+En el panel DNS de dascash.com.ar: registro **A** `@ → IP del VPS` y **A** `www → IP del VPS`. Verificar propagación: `nslookup dascash.com.ar` debe devolver la IP.
+
+- [ ] **Step 3: Preparar el VPS**
 
 ```bash
 ssh root@IP_DEL_VPS
 curl -fsSL https://get.docker.com | sh
-git clone https://github.com/TU_USUARIO/DasCash.git /opt/dascash
+git clone https://github.com/gkovalski7/DasCash.git /opt/dascash
 cd /opt/dascash
 ```
 
-(Si el repo es privado: crear un token de GitHub con scope `repo` y clonar con `https://TOKEN@github.com/...`.)
+(Repo privado: crear un fine-grained token de GitHub con acceso de lectura y clonar con `https://TOKEN@github.com/gkovalski7/DasCash.git`.)
 
-- [ ] **Step 3: Configurar variables de producción**
+- [ ] **Step 4: Configurar y levantar (primero en HTTP)**
 
 ```bash
 cp infra/.env.prod.example infra/.env.prod
-python3 -c "import secrets; print(secrets.token_urlsafe(50))"   # → DJANGO_SECRET_KEY
-nano infra/.env.prod
-```
-
-Completar: DOMAIN/SITE_ADDRESS/PUBLIC_URL con el dominio real, SECRET_KEY generada, password fuerte de Postgres. MP queda en test por ahora (paso 6).
-
-- [ ] **Step 4: Levantar**
-
-```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(64))"   # → DJANGO_SECRET_KEY
+nano infra/.env.prod   # completar SECRET_KEY, POSTGRES_PASSWORD fuerte, MP test por ahora; NGINX_CONF=dascash.conf
 docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod up -d --build
 docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod exec api python manage.py createsuperuser
 ```
 
-- [ ] **Step 5: Verificar HTTPS**
+Verificar: `http://dascash.com.ar` carga la landing.
 
-Abrir `https://app.midominio.com.ar` → la landing carga con candado (Caddy emitió el certificado solo). `https://.../admin/` → login del admin de Django con estilos.
+- [ ] **Step 5: Emitir el certificado y activar HTTPS**
+
+```bash
+docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod run --rm certbot \
+  certonly --webroot -w /var/www/certbot \
+  -d dascash.com.ar -d www.dascash.com.ar \
+  --email german.kovalski1@gmail.com --agree-tos --no-eff-email
+```
+
+Expected: "Successfully received certificate". Luego activar el conf TLS:
+
+```bash
+nano infra/.env.prod    # NGINX_CONF=dascash-ssl.conf  y  SECURE_HSTS_SECONDS=2592000
+docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod up -d web api
+```
+
+Verificar: `https://dascash.com.ar` con candado; `http://` redirige a `https://`. (La renovación queda automática: el servicio certbot renueva cada 12 h; nginx recarga el cert al reiniciar el contenedor — agendar un `docker compose restart web` mensual o tras cada deploy.)
 
 - [ ] **Step 6: Mercado Pago a producción**
 
-1. En el panel de desarrolladores de MP, activar las **credenciales de producción** de la aplicación (requiere completar los datos de homologación).
-2. En `infra/.env.prod`: `MP_ACCESS_TOKEN=APP_USR-...`, `MP_SANDBOX=false`.
-3. En el panel MP → Webhooks: URL `https://app.midominio.com.ar/api/cashback/webhooks/mercadopago/`, evento "Pagos". Copiar la **clave secreta** del webhook → `MP_WEBHOOK_SECRET` en `.env.prod`.
-4. `docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod up -d api` (recrea la api con las vars nuevas).
+1. Panel de desarrolladores MP → activar **credenciales de producción** (requiere homologación de la app).
+2. `infra/.env.prod`: `MP_ACCESS_TOKEN=APP_USR-...`, `MP_SANDBOX=false`.
+3. Panel MP → Webhooks: URL `https://dascash.com.ar/api/cashback/webhooks/mercadopago/`, evento "Pagos". Copiar la clave secreta → `MP_WEBHOOK_SECRET`.
+4. `docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod up -d api`
 
 - [ ] **Step 7: Cargar los datos reales del piloto**
 
-Desde `https://app.midominio.com.ar` logueado como admin, en el panel `/app/admin`:
-1. Crear el merchant del supermercado (usuario + entidad).
-2. Crear la store con su `qrcode_slug` (ej: `super-de-pedro`).
-3. Crear la causa del club (título, foto, categoría Deporte).
-4. Asignar la causa a la store y crear la campaña con el % acordado y fechas del piloto.
+Desde `https://dascash.com.ar` logueado como admin, en `/app/admin`:
+1. Merchant del supermercado (usuario + entidad).
+2. Store con su `qrcode_slug` (ej: `super-de-pedro`).
+3. Causa del club (título, foto, categoría Deporte).
+4. Asignar la causa a la store y crear la campaña con el % acordado y las fechas del piloto.
 
 - [ ] **Step 8: Generar e imprimir el QR**
 
-Con un token de admin (login → copiar access token), pedir:
+Con el access token del admin:
 
 ```bash
-curl -s https://app.midominio.com.ar/api/commerce/stores/1/qr/ -H "Authorization: Bearer TOKEN"
+curl -s https://dascash.com.ar/api/commerce/stores/1/qr/ -H "Authorization: Bearer TOKEN"
 ```
 
-El campo `qr_image` es un data-URL base64 → guardarlo como PNG e imprimir el cartel para la caja. Verificar antes que `payment_url` apunte al dominio público.
+`qr_image` es un data-URL base64 → guardar como PNG e imprimir el cartel para la caja. Verificar antes que `payment_url` apunte a `https://dascash.com.ar/app/pagar/<slug>`.
 
 - [ ] **Step 9: Prueba end-to-end con plata real**
 
-Compra real chica ($100) escaneando el QR impreso con un celular: registro → pago MP → volver a la app → verificar en Mi Impacto que figura la donación, y en el admin que la Purchase está APPROVED con su CashbackTransaction. **Esto cierra el prerequisito técnico del piloto.**
+Compra real chica ($100) escaneando el QR impreso con un celular: registro → pago MP → volver a la app → verificar en Mi Impacto que figura la donación, y en el admin que la Purchase quedó APPROVED con su CashbackTransaction. **Esto cierra el prerequisito técnico del piloto.**
 
 ---
 
 ## Self-review (hecho al escribir el plan)
 
-- **Cobertura del spec:** el spec pide para semanas 1-2: hosting público ✔ (Tasks 6-10) y «causa preferida» para que la caja sea escanear → monto → pagar ✔ (Tasks 1-5: registro con causa + aprendizaje al pagar + preselección). La métrica «tiempo de pago en caja» queda medible a mano (sin instrumentación extra — YAGNI).
+- **Cobertura del spec:** semanas 1-2 del spec piden hosting público ✔ (Tasks 6-8 sobre el stack v1.2 ya existente) y «causa preferida» para que la caja sea escanear → monto → pagar ✔ (Tasks 1-5). La métrica «tiempo de pago en caja» se mide a mano (YAGNI: sin instrumentación extra).
+- **Reuso verificado contra el repo:** `docker-compose.prod.yml`, `Dockerfile.prod`, `nginx/dascash.conf`, `.env.prod.example` y el gitignore de `.env.prod` **ya existen** (v1.2, smoke-testeado) — la Fase B solo agrega TLS y el deploy; no se duplica ni se cambia de arquitectura (se descartó Caddy/whitenoise para no tirar trabajo probado).
 - **Sin placeholders:** todos los pasos tienen código o comandos completos.
 - **Consistencia de tipos:** `preferred_cause` (number|null en TS, FK nullable en Django) y `preferred_cause_title` usados con el mismo nombre en serializers, api.ts y tests.
-- **Nota MP_SANDBOX:** el flag existe en settings y compose; el deploy lo pone en `false` recién en Task 10 Step 6, tras homologación.
+- **MP_SANDBOX:** queda en test hasta Task 8 Step 6 (tras homologación de credenciales de producción).
