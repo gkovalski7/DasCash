@@ -53,4 +53,16 @@ describe('PagoExitoso — reconciliación', () => {
     await new Promise((r) => setTimeout(r, 50))
     expect(getPurchaseImpact).not.toHaveBeenCalled()
   })
+
+  it('mientras el pago está PENDING mantiene el estimado y muestra "Confirmando"', async () => {
+    setSession()
+    vi.mocked(getPurchaseImpact).mockResolvedValue({
+      status: 'PENDING', contribution: null, cause_title: null, goal: null,
+    })
+    render(<MemoryRouter><PagoExitoso /></MemoryRouter>)
+    await waitFor(() => expect(getPurchaseImpact).toHaveBeenCalled())
+    // sigue confirmando (no se detuvo) y conserva la causa optimista del estimado
+    expect(await screen.findByText(/Confirmando tu aporte/i)).toBeDefined()
+    expect(screen.getByText(/tu club/)).toBeDefined()
+  })
 })

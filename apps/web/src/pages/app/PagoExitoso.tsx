@@ -49,11 +49,11 @@ export default function PagoExitoso() {
     if (!purchaseId) return
     let cancelled = false
     let attempts = 0
+    let timeoutId: ReturnType<typeof setTimeout>
     setConfirming(true)
 
-    const stop = () => {
+    const finish = () => {
       if (!cancelled) setConfirming(false)
-      clearInterval(timer)
     }
     const tick = async () => {
       attempts += 1
@@ -64,19 +64,26 @@ export default function PagoExitoso() {
         if (impact.status === 'APPROVED' && impact.contribution !== null) {
           setCashback(impact.contribution)
           if (impact.cause_title) setCause(impact.cause_title)
-          stop()
-        } else if (impact.status === 'REJECTED' || attempts >= 6) {
-          stop()
+          finish()
+          return
+        }
+        if (impact.status === 'REJECTED' || attempts >= 6) {
+          finish()
+          return
         }
       } catch {
-        if (attempts >= 6) stop()
+        if (cancelled) return
+        if (attempts >= 6) {
+          finish()
+          return
+        }
       }
+      if (!cancelled) timeoutId = setTimeout(tick, 2000)
     }
-    const timer = setInterval(tick, 2000)
     tick()
     return () => {
       cancelled = true
-      clearInterval(timer)
+      clearTimeout(timeoutId)
     }
   }, [])
 
