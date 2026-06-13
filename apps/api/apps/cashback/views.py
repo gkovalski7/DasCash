@@ -6,7 +6,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
-from .models import Campaign, CampaignStore, Purchase, CashbackTransaction, Goal, active_goal_for
+from .models import Campaign, CampaignStore, Purchase, CashbackTransaction, active_goal_for
 from .serializers import (
     CampaignSerializer,
     PurchaseSerializer,

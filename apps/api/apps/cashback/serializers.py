@@ -170,6 +170,3 @@ class GoalSerializer(serializers.ModelSerializer):
     class Meta:
         model = Goal
         fields = ("title", "target_amount", "current_amount", "percent")
-
-
-
