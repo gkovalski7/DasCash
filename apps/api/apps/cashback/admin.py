@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Campaign, CampaignStore, Purchase, CashbackTransaction, ReceiptUpload
+from .models import Campaign, CampaignStore, Purchase, CashbackTransaction, ReceiptUpload, Goal
 
 
 class CampaignStoreInline(admin.TabularInline):
@@ -31,6 +31,12 @@ class CashbackTransactionAdmin(admin.ModelAdmin):
 @admin.register(ReceiptUpload)
 class ReceiptUploadAdmin(admin.ModelAdmin):
     list_display = ("id", "purchase", "ocr_status")
+
+
+@admin.register(Goal)
+class GoalAdmin(admin.ModelAdmin):
+    list_display = ("id", "title", "cause", "target_amount", "active", "starts_at")
+    list_filter = ("active", "cause")
 
 
 
