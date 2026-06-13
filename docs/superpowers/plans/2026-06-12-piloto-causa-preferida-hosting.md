@@ -913,7 +913,9 @@ nano infra/.env.prod    # NGINX_CONF=dascash-ssl.conf  y  SECURE_HSTS_SECONDS=25
 docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod up -d web api
 ```
 
-Verificar: `https://dascash.com.ar` con candado; `http://` redirige a `https://`. (La renovación queda automática: el servicio certbot renueva cada 12 h; nginx recarga el cert al reiniciar el contenedor — agendar un `docker compose restart web` mensual o tras cada deploy.)
+Verificar: `https://dascash.com.ar` con candado; `http://` redirige a `https://`.
+
+**⚠️ Recordatorio de renovación (importante):** el servicio `certbot` renueva el certificado en disco cada 12 h, pero nginx sólo lee el cert nuevo al reiniciarse. Agendá un `docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod restart web` **mensual** (o tras cada deploy). Si se olvida, el cert se renueva pero nginx sigue sirviendo el viejo hasta que expira (~60-90 días) y entonces el sitio deja de cargar por HTTPS.
 
 - [ ] **Step 6: Mercado Pago a producción**
 
