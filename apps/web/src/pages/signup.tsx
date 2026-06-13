@@ -1,7 +1,7 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
-import { post } from '../lib/api'
+import { post, fetchCauses, type ApiCause } from '../lib/api'
 
 export default function SignupPage() {
     // Conserva state.from (ruta privada original, ej: pago QR) a través del ida y vuelta login ↔ signup
@@ -12,6 +12,12 @@ export default function SignupPage() {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState(false)
+    const [causes, setCauses] = useState<ApiCause[]>([])
+    const [preferredCauseId, setPreferredCauseId] = useState<number | null>(null)
+
+    useEffect(() => {
+        fetchCauses().then(setCauses).catch(() => setCauses([]))
+    }, [])
 
     const onSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -22,7 +28,13 @@ export default function SignupPage() {
         setLoading(true)
         try {
             // API expects username; we default it to email on backend, but send explicitly for compatibility
-            await post('/api/auth/register', { email, username: email, password, role: 'CONSUMER' })
+            await post('/api/auth/register', {
+                email,
+                username: email,
+                password,
+                role: 'CONSUMER',
+                ...(preferredCauseId !== null ? { preferred_cause: preferredCauseId } : {}),
+            })
             setSuccess(true)
         } catch (err: any) {
             setError(err?.message || 'Error al registrarse')
@@ -98,6 +110,34 @@ export default function SignupPage() {
                             minLength={8}
                         />
                     </div>
+
+                    {causes.length > 0 && (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                ¿Qué causa querés apoyar? <span className="text-gray-400">(opcional)</span>
+                            </label>
+                            <div className="space-y-2">
+                                {causes.map((c) => (
+                                    <button
+                                        type="button"
+                                        key={c.id}
+                                        onClick={() =>
+                                            setPreferredCauseId(preferredCauseId === c.id ? null : c.id)
+                                        }
+                                        aria-pressed={preferredCauseId === c.id}
+                                        className={`w-full text-left px-3 py-2 rounded-lg border transition-colors ${
+                                            preferredCauseId === c.id
+                                                ? 'border-green-600 bg-green-50'
+                                                : 'border-gray-300 hover:border-gray-400'
+                                        }`}
+                                    >
+                                        <span className="text-sm font-medium text-gray-900">{c.title}</span>
+                                        <span className="text-xs text-gray-500 ml-2">{c.category}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     <Button
                         type="submit"
