@@ -1006,3 +1006,54 @@ class GoalModelTests(BaseTestCase):
         txn.status = "SETTLED"
         txn.save(update_fields=["status"])
         self.assertEqual(goal.current_amount, Decimal("40.00"))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Impact — endpoint para reconciliar aporte de una compra con la meta colectiva
+# ═══════════════════════════════════════════════════════════════════════════
+class ImpactEndpointTests(BaseTestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.client.force_authenticate(self.consumer)
+        self.purchase = Purchase.objects.create(
+            user=self.consumer, store=self.store, amount=Decimal("1500"),
+            source="QR", status="PENDING", selected_cause=self.cause_a,
+        )
+
+    def _url(self, pk):
+        return f"/api/cashback/purchases/{pk}/impact/"
+
+    def test_impact_sin_cashback_devuelve_contribution_null(self):
+        res = self.client.get(self._url(self.purchase.id))
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["status"], "PENDING")
+        self.assertIsNone(res.data["contribution"])
+        self.assertEqual(res.data["cause_title"], self.cause_a.title)
+
+    def test_impact_con_cashback_devuelve_monto_y_goal(self):
+        Goal.objects.create(
+            cause=self.cause_a, title="Camisetas", target_amount=Decimal("1000"),
+            starts_at=timezone.now() - timedelta(days=1),
+        )
+        self.purchase.status = "APPROVED"
+        self.purchase.save(update_fields=["status"])
+        CashbackTransaction.objects.create(
+            user=self.consumer, purchase=self.purchase, cause=self.cause_a,
+            percentage=Decimal("5"), amount=Decimal("75.00"),
+        )
+        res = self.client.get(self._url(self.purchase.id))
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["status"], "APPROVED")
+        self.assertEqual(res.data["contribution"], "75.00")
+        self.assertEqual(res.data["goal"]["title"], "Camisetas")
+        self.assertEqual(res.data["goal"]["current_amount"], "75.00")
+        self.assertEqual(res.data["goal"]["percent"], 7)
+
+    def test_impact_sin_meta_devuelve_goal_null(self):
+        res = self.client.get(self._url(self.purchase.id))
+        self.assertIsNone(res.data["goal"])
+
+    def test_impact_scoping_otro_usuario_404(self):
+        self.client.force_authenticate(self.consumer2)
+        res = self.client.get(self._url(self.purchase.id))
+        self.assertEqual(res.status_code, 404)
