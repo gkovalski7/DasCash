@@ -23,6 +23,9 @@ class CauseSerializer(serializers.ModelSerializer):
         read_only_fields = ["slug"]
 
     def get_active_goal(self, obj):
+        view = self.context.get("view")
+        if not view or getattr(view, "action", None) != "retrieve":
+            return None
         from apps.cashback.models import active_goal_for
         from apps.cashback.serializers import GoalSerializer
         goal = active_goal_for(obj)
