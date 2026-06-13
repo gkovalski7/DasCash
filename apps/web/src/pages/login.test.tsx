@@ -8,6 +8,7 @@ import { post } from '../lib/api'
 
 vi.mock('../lib/api', () => ({
     post: vi.fn(),
+    fetchCauses: vi.fn().mockResolvedValue([]),
 }))
 
 function renderLogin(state?: Record<string, unknown>) {

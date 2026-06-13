@@ -858,3 +858,66 @@ class TestMPWebhookSignature(BaseTestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         purchase.refresh_from_db()
         self.assertEqual(purchase.status, "APPROVED")
+
+
+class PaymentLearnsPreferredCauseTests(BaseTestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.client.force_authenticate(self.consumer)
+
+    @patch("apps.cashback.payment_views.MercadoPagoService")
+    def test_initiate_actualiza_preferred_cause_del_usuario(self, mock_mp):
+        mock_mp.return_value.create_checkout_preference.return_value = {
+            "preference_id": "pref-test-1",
+            "checkout_url": "https://mp.test/checkout/pref-test-1",
+        }
+        res = self.client.post(
+            "/api/cashback/payments/initiate/",
+            {
+                "store_slug": self.store.qrcode_slug,
+                "amount": 1000,
+                "selected_cause_id": self.cause_a.id,
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, 201)
+        self.consumer.refresh_from_db()
+        self.assertEqual(self.consumer.preferred_cause_id, self.cause_a.id)
+
+    @patch("apps.cashback.payment_views.MercadoPagoService")
+    def test_initiate_sin_causa_no_pisa_la_preferida(self, mock_mp):
+        mock_mp.return_value.create_checkout_preference.return_value = {
+            "preference_id": "pref-test-2",
+            "checkout_url": "https://mp.test/checkout/pref-test-2",
+        }
+        self.consumer.preferred_cause = self.cause_b
+        self.consumer.save(update_fields=["preferred_cause"])
+        res = self.client.post(
+            "/api/cashback/payments/initiate/",
+            {"store_slug": self.store.qrcode_slug, "amount": 500},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 201)
+        self.consumer.refresh_from_db()
+        self.assertEqual(self.consumer.preferred_cause_id, self.cause_b.id)
+
+    @patch("apps.cashback.payment_views.MercadoPagoService")
+    def test_initiate_cambia_la_preferida_existente(self, mock_mp):
+        mock_mp.return_value.create_checkout_preference.return_value = {
+            "preference_id": "pref-test-3",
+            "checkout_url": "https://mp.test/checkout/pref-test-3",
+        }
+        self.consumer.preferred_cause = self.cause_b
+        self.consumer.save(update_fields=["preferred_cause"])
+        res = self.client.post(
+            "/api/cashback/payments/initiate/",
+            {
+                "store_slug": self.store.qrcode_slug,
+                "amount": 800,
+                "selected_cause_id": self.cause_a.id,
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, 201)
+        self.consumer.refresh_from_db()
+        self.assertEqual(self.consumer.preferred_cause_id, self.cause_a.id)

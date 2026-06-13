@@ -8,7 +8,7 @@ import {
   Store as StoreIcon,
   ExternalLink,
 } from 'lucide-react'
-import { get, post } from '../../lib/api'
+import { get, post, getProfile } from '../../lib/api'
 
 interface SupportedCause {
   id: number
@@ -55,11 +55,17 @@ export default function PagarComercio() {
 
   useEffect(() => {
     if (!slug) return
-    get<StoreInfo>(`/api/commerce/stores/by-slug/${slug}/`)
-      .then((data) => {
+    Promise.all([
+      get<StoreInfo>(`/api/commerce/stores/by-slug/${slug}/`),
+      getProfile().catch(() => null),
+    ])
+      .then(([data, profile]) => {
         setStore(data)
         if (data.supported_causes.length > 0) {
-          setSelectedCauseId(data.supported_causes[0].id)
+          const preferred = profile?.preferred_cause
+            ? data.supported_causes.find((c) => c.id === profile.preferred_cause)
+            : undefined
+          setSelectedCauseId((preferred ?? data.supported_causes[0]).id)
         }
         setPageState('ready')
       })
@@ -242,6 +248,7 @@ export default function PagarComercio() {
                 <button
                   key={cause.id}
                   onClick={() => setSelectedCauseId(cause.id)}
+                  aria-pressed={selectedCauseId === cause.id}
                   className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl
                                border-2 transition-all text-left ${
                                  selectedCauseId === cause.id

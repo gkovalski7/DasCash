@@ -168,6 +168,12 @@ class InitiateQRPaymentView(APIView):
             selected_cause=cause,
         )
 
+        # La causa elegida al pagar se vuelve la preferida del usuario
+        # (preselección en el próximo pago).
+        if cause and request.user.preferred_cause_id != cause.id:
+            request.user.preferred_cause = cause
+            request.user.save(update_fields=["preferred_cause"])
+
         try:
             mp_service = MercadoPagoService()
             mp_data = mp_service.create_checkout_preference(

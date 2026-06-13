@@ -2,6 +2,8 @@ from django.contrib.auth import get_user_model
 from django.db.models import Sum
 from rest_framework import serializers
 
+from apps.causes.models import Cause
+
 User = get_user_model()
 
 
@@ -14,10 +16,15 @@ class RegisterSerializer(serializers.ModelSerializer):
         choices=[("CONSUMER", "CONSUMER"), ("MERCHANT", "MERCHANT")],
         default="CONSUMER",
     )
+    preferred_cause = serializers.PrimaryKeyRelatedField(
+        queryset=Cause.objects.filter(is_active=True),
+        allow_null=True,
+        required=False,
+    )
 
     class Meta:
         model = User
-        fields = ("id", "email", "username", "password", "role")
+        fields = ("id", "email", "username", "password", "role", "preferred_cause")
         extra_kwargs = {
             "username": {"required": False},
         }
@@ -47,11 +54,20 @@ class ProfileSerializer(serializers.ModelSerializer):
     total_donated = serializers.SerializerMethodField()
     causes_count = serializers.SerializerMethodField()
     purchases_count = serializers.SerializerMethodField()
+    preferred_cause = serializers.PrimaryKeyRelatedField(
+        queryset=Cause.objects.filter(is_active=True),
+        allow_null=True,
+        required=False,
+    )
+    preferred_cause_title = serializers.CharField(
+        source="preferred_cause.title", read_only=True, default=None
+    )
 
     class Meta:
         model = User
         fields = (
             "id", "email", "username", "first_name", "last_name", "role",
+            "preferred_cause", "preferred_cause_title",
             "total_donated", "causes_count", "purchases_count",
         )
         read_only_fields = ("id", "email", "role")

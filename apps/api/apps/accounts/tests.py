@@ -185,3 +185,90 @@ class TestDonationsGet(ProfileTestCase):
         client = self._client_for(self.merchant_user)
         resp = client.get("/api/profile/donations/")
         self.assertEqual(len(resp.data), 0)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# J. preferred_cause en perfil
+# ═══════════════════════════════════════════════════════════════════════════
+class PreferredCauseProfileTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
+            username="pc@t.com", email="pc@t.com", password="Pass1234!", role="CONSUMER"
+        )
+        cls.cause = Cause.objects.create(title="Club Test", category="Deporte", is_active=True)
+        cls.cause_inactive = Cause.objects.create(title="Inactiva", category="Salud", is_active=False)
+
+    def setUp(self):
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+
+    def test_profile_incluye_preferred_cause_null_por_defecto(self):
+        res = self.client.get("/api/profile/")
+        self.assertEqual(res.status_code, 200)
+        self.assertIsNone(res.data["preferred_cause"])
+        self.assertIsNone(res.data["preferred_cause_title"])
+
+    def test_patch_setea_preferred_cause(self):
+        res = self.client.patch(
+            "/api/profile/", {"preferred_cause": self.cause.id}, format="json"
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["preferred_cause"], self.cause.id)
+        self.assertEqual(res.data["preferred_cause_title"], "Club Test")
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.preferred_cause_id, self.cause.id)
+
+    def test_patch_acepta_null_para_limpiar(self):
+        self.user.preferred_cause = self.cause
+        self.user.save(update_fields=["preferred_cause"])
+        res = self.client.patch("/api/profile/", {"preferred_cause": None}, format="json")
+        self.assertEqual(res.status_code, 200)
+        self.assertIsNone(res.data["preferred_cause"])
+
+    def test_patch_rechaza_causa_inactiva(self):
+        res = self.client.patch(
+            "/api/profile/", {"preferred_cause": self.cause_inactive.id}, format="json"
+        )
+        self.assertEqual(res.status_code, 400)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# K. preferred_cause en registro
+# ═══════════════════════════════════════════════════════════════════════════
+class RegisterPreferredCauseTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.cause = Cause.objects.create(title="Club Registro", category="Deporte", is_active=True)
+        cls.cause_inactive = Cause.objects.create(title="Inactiva Registro", category="Salud", is_active=False)
+
+    def setUp(self):
+        self.client = APIClient()
+
+    def test_registro_con_preferred_cause(self):
+        res = self.client.post(
+            "/api/auth/register",
+            {"email": "nuevo@t.com", "password": "Pass1234!", "preferred_cause": self.cause.id},
+            format="json",
+        )
+        self.assertIn(res.status_code, (200, 201))
+        user = User.objects.get(email="nuevo@t.com")
+        self.assertEqual(user.preferred_cause_id, self.cause.id)
+
+    def test_registro_sin_preferred_cause_sigue_funcionando(self):
+        res = self.client.post(
+            "/api/auth/register",
+            {"email": "n2@t.com", "password": "Pass1234!"},
+            format="json",
+        )
+        self.assertIn(res.status_code, (200, 201))
+        self.assertIsNone(User.objects.get(email="n2@t.com").preferred_cause)
+
+    def test_registro_rechaza_causa_inactiva(self):
+        res = self.client.post(
+            "/api/auth/register",
+            {"email": "n3@t.com", "password": "Pass1234!", "preferred_cause": self.cause_inactive.id},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 400)
+        self.assertFalse(User.objects.filter(email="n3@t.com").exists())
