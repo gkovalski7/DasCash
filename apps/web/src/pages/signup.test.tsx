@@ -49,6 +49,17 @@ describe('SignupPage — causa preferida', () => {
     expect(body).not.toHaveProperty('preferred_cause')
   })
 
+  it('deseleccionar la causa la quita del payload', async () => {
+    render(<MemoryRouter><SignupPage /></MemoryRouter>)
+    const user = await fillAndSubmit()
+    const causeBtn = await screen.findByRole('button', { name: /Club Deportivo/ })
+    await user.click(causeBtn)
+    await user.click(causeBtn)
+    await user.click(screen.getByRole('button', { name: 'Crear cuenta' }))
+    const body = vi.mocked(post).mock.calls[0][1] as Record<string, unknown>
+    expect(body).not.toHaveProperty('preferred_cause')
+  })
+
   it('el registro funciona aunque las causas no carguen', async () => {
     vi.mocked(fetchCauses).mockRejectedValue(new Error('network'))
     render(<MemoryRouter><SignupPage /></MemoryRouter>)

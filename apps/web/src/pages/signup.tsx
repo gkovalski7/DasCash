@@ -16,7 +16,11 @@ export default function SignupPage() {
     const [preferredCauseId, setPreferredCauseId] = useState<number | null>(null)
 
     useEffect(() => {
-        fetchCauses().then(setCauses).catch(() => setCauses([]))
+        let cancelled = false
+        fetchCauses()
+            .then((c) => { if (!cancelled) setCauses(c) })
+            .catch(() => { if (!cancelled) setCauses([]) })
+        return () => { cancelled = true }
     }, [])
 
     const onSubmit = async (e: React.FormEvent) => {
