@@ -994,3 +994,15 @@ class GoalModelTests(BaseTestCase):
             active=False, starts_at=timezone.now() - timedelta(days=1),
         )
         self.assertIsNone(active_goal_for(self.cause_a))
+
+    def test_current_amount_cuenta_sin_importar_status(self):
+        # La existencia del CashbackTransaction = aporte confirmado; el status
+        # (PENDING/SETTLED/PAID) es de liquidación, NO debe filtrar el progreso.
+        goal = Goal.objects.create(
+            cause=self.cause_a, title="M", target_amount=Decimal("1000"),
+            starts_at=timezone.now() - timedelta(days=1),
+        )
+        txn = self._cashback(self.cause_a, "40")
+        txn.status = "SETTLED"
+        txn.save(update_fields=["status"])
+        self.assertEqual(goal.current_amount, Decimal("40.00"))
