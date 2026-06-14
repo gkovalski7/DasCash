@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useParams, useLocation } from 'react-router-dom'
 import { fetchCauseBySlug, type ApiCause } from '../../lib/api'
+import GoalProgress from '../../components/GoalProgress'
 
 export default function CauseDetailPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -101,6 +102,17 @@ export default function CauseDetailPage() {
         {cause.summary && (
           <div className="prose prose-gray max-w-none">
             <p className="text-gray-700 text-base leading-relaxed">{cause.summary}</p>
+          </div>
+        )}
+
+        {cause.active_goal && (
+          <div className="mt-6 rounded-2xl bg-[#0A2236] p-5 max-w-md">
+            <GoalProgress
+              title={cause.active_goal.title}
+              currentAmount={cause.active_goal.current_amount}
+              targetAmount={cause.active_goal.target_amount}
+              percent={cause.active_goal.percent}
+            />
           </div>
         )}
       </div>

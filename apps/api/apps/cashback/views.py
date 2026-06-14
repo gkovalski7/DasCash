@@ -6,11 +6,12 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
-from .models import Campaign, CampaignStore, Purchase, CashbackTransaction
+from .models import Campaign, CampaignStore, Purchase, CashbackTransaction, active_goal_for
 from .serializers import (
     CampaignSerializer,
     PurchaseSerializer,
     CashbackTransactionSerializer,
+    GoalSerializer,
 )
 from apps.accounts.permissions import IsAdmin, IsMerchant, IsConsumer
 from core.pagination import StandardPagination
@@ -120,6 +121,19 @@ class PurchaseViewSet(viewsets.ModelViewSet):
             "transactions_count": 1,
             "cause": cause.title if cause else None,
             "campaign": campaign_store.campaign.name,
+        })
+
+    @action(detail=True, methods=["get"])
+    def impact(self, request, pk=None):
+        purchase = self.get_object()
+        txn = purchase.cashbacktransaction_set.first()
+        cause = txn.cause if txn else purchase.selected_cause
+        goal = active_goal_for(cause) if cause else None
+        return Response({
+            "status": purchase.status,
+            "contribution": str(txn.amount) if txn else None,
+            "cause_title": cause.title if cause else None,
+            "goal": GoalSerializer(goal).data if goal else None,
         })
 
 

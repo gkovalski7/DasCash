@@ -1,6 +1,9 @@
+from decimal import Decimal
+
 from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
+from django.utils import timezone
 from apps.commerce.models import Store
 
 
@@ -127,3 +130,37 @@ class MPPaymentData(models.Model):
 
     def __str__(self):
         return f"MPPayment #{self.id} — Purchase {self.purchase_id} — {self.mp_status}"
+
+
+class Goal(models.Model):
+    cause = models.ForeignKey(
+        "causes.Cause", on_delete=models.CASCADE, related_name="goals"
+    )
+    title = models.CharField(max_length=200)
+    target_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    active = models.BooleanField(default=True)
+    starts_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self) -> str:
+        return f"{self.title} ({self.cause.title})"
+
+    @property
+    def current_amount(self) -> Decimal:
+        total = CashbackTransaction.objects.filter(
+            cause=self.cause,
+            purchase__created_at__gte=self.starts_at,
+        ).aggregate(s=models.Sum("amount"))["s"]
+        return (total or Decimal("0")).quantize(Decimal("0.01"))
+
+    @property
+    def percent(self) -> int:
+        if self.target_amount <= 0:
+            return 0
+        raw = (self.current_amount / self.target_amount) * 100
+        return min(int(raw), 100)
+
+
+def active_goal_for(cause):
+    """Meta activa más reciente de una causa, o None."""
+    return cause.goals.filter(active=True).order_by("-starts_at").first()

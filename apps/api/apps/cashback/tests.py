@@ -16,7 +16,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from rest_framework import status
 
-from apps.cashback.models import Campaign, CampaignStore, Purchase, CashbackTransaction
+from apps.cashback.models import Campaign, CampaignStore, Purchase, CashbackTransaction, Goal, active_goal_for
 from apps.causes.models import Cause
 from apps.commerce.models import Merchant, Store, StoreSupportedCause
 
@@ -921,3 +921,139 @@ class PaymentLearnsPreferredCauseTests(BaseTestCase):
         self.assertEqual(res.status_code, 201)
         self.consumer.refresh_from_db()
         self.assertEqual(self.consumer.preferred_cause_id, self.cause_a.id)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# G. Goal — modelo de meta colectiva con progreso calculado
+# ═══════════════════════════════════════════════════════════════════════════
+class GoalModelTests(BaseTestCase):
+    def _cashback(self, cause, amount, created_offset_days=0):
+        """Crea una Purchase + CashbackTransaction para `cause`."""
+        p = Purchase.objects.create(
+            user=self.consumer, store=self.store, amount=Decimal("1000"),
+            source="QR", status="APPROVED", selected_cause=cause,
+        )
+        if created_offset_days:
+            new_dt = timezone.now() + timedelta(days=created_offset_days)
+            Purchase.objects.filter(pk=p.pk).update(created_at=new_dt)
+        return CashbackTransaction.objects.create(
+            user=self.consumer, purchase=p, cause=cause,
+            percentage=Decimal("5"), amount=Decimal(str(amount)),
+        )
+
+    def test_current_amount_suma_cashback_de_la_causa(self):
+        goal = Goal.objects.create(
+            cause=self.cause_a, title="Camisetas", target_amount=Decimal("1000"),
+            starts_at=timezone.now() - timedelta(days=1),
+        )
+        self._cashback(self.cause_a, "50")
+        self._cashback(self.cause_a, "30")
+        self._cashback(self.cause_b, "999")  # otra causa, no cuenta
+        self.assertEqual(goal.current_amount, Decimal("80.00"))
+
+    def test_current_amount_acotado_por_starts_at(self):
+        # meta arranca mañana; una compra de hoy NO debe contar
+        goal = Goal.objects.create(
+            cause=self.cause_a, title="M", target_amount=Decimal("1000"),
+            starts_at=timezone.now() + timedelta(days=1),
+        )
+        self._cashback(self.cause_a, "50")
+        self.assertEqual(goal.current_amount, Decimal("0.00"))
+
+    def test_percent_calcula_y_capa_a_100(self):
+        goal = Goal.objects.create(
+            cause=self.cause_a, title="M", target_amount=Decimal("100"),
+            starts_at=timezone.now() - timedelta(days=1),
+        )
+        self._cashback(self.cause_a, "25")
+        self.assertEqual(goal.percent, 25)
+        self._cashback(self.cause_a, "200")  # total 225 > 100
+        self.assertEqual(goal.percent, 100)
+
+    def test_percent_cero_si_target_cero(self):
+        goal = Goal.objects.create(
+            cause=self.cause_a, title="M", target_amount=Decimal("0"),
+            starts_at=timezone.now() - timedelta(days=1),
+        )
+        self.assertEqual(goal.percent, 0)
+
+    def test_active_goal_for_devuelve_la_activa_mas_reciente(self):
+        Goal.objects.create(
+            cause=self.cause_a, title="vieja", target_amount=Decimal("100"),
+            active=True, starts_at=timezone.now() - timedelta(days=10),
+        )
+        nueva = Goal.objects.create(
+            cause=self.cause_a, title="nueva", target_amount=Decimal("100"),
+            active=True, starts_at=timezone.now() - timedelta(days=1),
+        )
+        self.assertEqual(active_goal_for(self.cause_a), nueva)
+
+    def test_active_goal_for_none_si_no_hay_activa(self):
+        Goal.objects.create(
+            cause=self.cause_a, title="inactiva", target_amount=Decimal("100"),
+            active=False, starts_at=timezone.now() - timedelta(days=1),
+        )
+        self.assertIsNone(active_goal_for(self.cause_a))
+
+    def test_current_amount_cuenta_sin_importar_status(self):
+        # La existencia del CashbackTransaction = aporte confirmado; el status
+        # (PENDING/SETTLED/PAID) es de liquidación, NO debe filtrar el progreso.
+        goal = Goal.objects.create(
+            cause=self.cause_a, title="M", target_amount=Decimal("1000"),
+            starts_at=timezone.now() - timedelta(days=1),
+        )
+        txn = self._cashback(self.cause_a, "40")
+        txn.status = "SETTLED"
+        txn.save(update_fields=["status"])
+        self.assertEqual(goal.current_amount, Decimal("40.00"))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Impact — endpoint para reconciliar aporte de una compra con la meta colectiva
+# ═══════════════════════════════════════════════════════════════════════════
+class ImpactEndpointTests(BaseTestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.client.force_authenticate(self.consumer)
+        self.purchase = Purchase.objects.create(
+            user=self.consumer, store=self.store, amount=Decimal("1500"),
+            source="QR", status="PENDING", selected_cause=self.cause_a,
+        )
+
+    def _url(self, pk):
+        return f"/api/cashback/purchases/{pk}/impact/"
+
+    def test_impact_sin_cashback_devuelve_contribution_null(self):
+        res = self.client.get(self._url(self.purchase.id))
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["status"], "PENDING")
+        self.assertIsNone(res.data["contribution"])
+        self.assertEqual(res.data["cause_title"], self.cause_a.title)
+
+    def test_impact_con_cashback_devuelve_monto_y_goal(self):
+        Goal.objects.create(
+            cause=self.cause_a, title="Camisetas", target_amount=Decimal("1000"),
+            starts_at=timezone.now() - timedelta(days=1),
+        )
+        self.purchase.status = "APPROVED"
+        self.purchase.save(update_fields=["status"])
+        CashbackTransaction.objects.create(
+            user=self.consumer, purchase=self.purchase, cause=self.cause_a,
+            percentage=Decimal("5"), amount=Decimal("75.00"),
+        )
+        res = self.client.get(self._url(self.purchase.id))
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["status"], "APPROVED")
+        self.assertEqual(res.data["contribution"], "75.00")
+        self.assertEqual(res.data["goal"]["title"], "Camisetas")
+        self.assertEqual(res.data["goal"]["current_amount"], "75.00")
+        self.assertEqual(res.data["goal"]["percent"], 7)
+
+    def test_impact_sin_meta_devuelve_goal_null(self):
+        res = self.client.get(self._url(self.purchase.id))
+        self.assertIsNone(res.data["goal"])
+
+    def test_impact_scoping_otro_usuario_404(self):
+        self.client.force_authenticate(self.consumer2)
+        res = self.client.get(self._url(self.purchase.id))
+        self.assertEqual(res.status_code, 404)

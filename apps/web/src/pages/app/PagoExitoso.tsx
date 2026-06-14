@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CheckCircle2, Heart, ArrowRight, Home, Clock } from 'lucide-react'
+import { getPurchaseImpact, type ApiGoal } from '../../lib/api'
+import GoalProgress from '../../components/GoalProgress'
 
 export default function PagoExitoso() {
   const navigate = useNavigate()
@@ -10,33 +12,82 @@ export default function PagoExitoso() {
   const [cause, setCause] = useState('tu club')
   const [storeName, setStoreName] = useState('')
   const [displayAmount, setDisplayAmount] = useState(0)
+  const [goal, setGoal] = useState<ApiGoal | null>(null)
+  const [confirming, setConfirming] = useState(false)
 
   const mpStatus = searchParams.get('status') || 'approved'
   const isPending = mpStatus === 'pending' || mpStatus === 'in_process'
 
+  // 1. Estimado optimista desde sessionStorage (al instante)
   useEffect(() => {
-    const cb = sessionStorage.getItem('dc_cashback') || '0'
-    const causeName = sessionStorage.getItem('dc_cause') || 'tu club'
-    const store = sessionStorage.getItem('dc_store') || ''
+    setCashback(sessionStorage.getItem('dc_cashback') || '0')
+    setCause(sessionStorage.getItem('dc_cause') || 'tu club')
+    setStoreName(sessionStorage.getItem('dc_store') || '')
+  }, [])
 
-    setCashback(cb)
-    setCause(causeName)
-    setStoreName(store)
+  // 2. Animación de conteo: re-corre cada vez que cambia `cashback`
+  useEffect(() => {
+    const target = parseFloat(cashback) || 0
+    if (target <= 0) {
+      setDisplayAmount(0)
+      return
+    }
+    let current = 0
+    const steps = 40
+    const increment = target / steps
+    const timer = setInterval(() => {
+      current = Math.min(current + increment, target)
+      setDisplayAmount(current)
+      if (current >= target) clearInterval(timer)
+    }, 35)
+    return () => clearInterval(timer)
+  }, [cashback])
 
-    const target = parseFloat(cb) || 0
-    if (target > 0) {
-      let current = 0
-      const steps = 40
-      const increment = target / steps
-      const timer = setInterval(() => {
-        current = Math.min(current + increment, target)
-        setDisplayAmount(current)
-        if (current >= target) clearInterval(timer)
-      }, 35)
-      return () => clearInterval(timer)
+  // 3. Reconciliación contra el webhook real
+  useEffect(() => {
+    const purchaseId = sessionStorage.getItem('dc_purchase_id')
+    if (!purchaseId) return
+    let cancelled = false
+    let attempts = 0
+    let timeoutId: ReturnType<typeof setTimeout>
+    setConfirming(true)
+
+    const finish = () => {
+      if (!cancelled) setConfirming(false)
+    }
+    const tick = async () => {
+      attempts += 1
+      try {
+        const impact = await getPurchaseImpact(Number(purchaseId))
+        if (cancelled) return
+        if (impact.goal) setGoal(impact.goal)
+        if (impact.status === 'APPROVED' && impact.contribution !== null) {
+          setCashback(impact.contribution)
+          if (impact.cause_title) setCause(impact.cause_title)
+          finish()
+          return
+        }
+        if (impact.status === 'REJECTED' || attempts >= 6) {
+          finish()
+          return
+        }
+      } catch {
+        if (cancelled) return
+        if (attempts >= 6) {
+          finish()
+          return
+        }
+      }
+      if (!cancelled) timeoutId = setTimeout(tick, 2000)
+    }
+    tick()
+    return () => {
+      cancelled = true
+      clearTimeout(timeoutId)
     }
   }, [])
 
+  // 4. Limpieza de sessionStorage al desmontar
   useEffect(() => {
     return () => {
       ;['dc_purchase_id', 'dc_store', 'dc_cause', 'dc_amount', 'dc_cashback'].forEach(
@@ -72,7 +123,7 @@ export default function PagoExitoso() {
             </p>
           )}
 
-          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-3xl px-6 py-7 mb-8">
+          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-3xl px-6 py-7 mb-4">
             <div className="flex items-center justify-center gap-2 mb-3">
               <Heart size={18} className="text-rose-400 fill-rose-400" />
               <span className="text-white/60 text-sm font-medium">
@@ -86,6 +137,9 @@ export default function PagoExitoso() {
               {isPending ? 'irán a' : 'fueron a'}{' '}
               <span className="font-bold text-brand-lime-300">{cause}</span>
             </p>
+            {confirming && (
+              <p className="text-white/40 text-xs mt-3">Confirmando tu aporte…</p>
+            )}
             {isPending && (
               <div className="mt-4 bg-yellow-400/10 border border-yellow-400/20 rounded-xl px-4 py-3">
                 <p className="text-yellow-300 text-xs leading-relaxed">
@@ -95,6 +149,17 @@ export default function PagoExitoso() {
               </div>
             )}
           </div>
+
+          {goal && (
+            <div className="mb-8">
+              <GoalProgress
+                title={goal.title}
+                currentAmount={goal.current_amount}
+                targetAmount={goal.target_amount}
+                percent={goal.percent}
+              />
+            </div>
+          )}
 
           <div className="space-y-3">
             <button

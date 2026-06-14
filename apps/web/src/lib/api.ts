@@ -198,6 +198,17 @@ export function approvePurchase(id: number): Promise<ApiApproveResponse> {
   return post<ApiApproveResponse>(`/api/cashback/purchases/${id}/approve/`)
 }
 
+export type PurchaseImpact = {
+  status: 'PENDING' | 'APPROVED' | 'REJECTED'
+  contribution: string | null
+  cause_title: string | null
+  goal: ApiGoal | null
+}
+
+export function getPurchaseImpact(id: number): Promise<PurchaseImpact> {
+  return get<PurchaseImpact>(`/api/cashback/purchases/${id}/impact/`)
+}
+
 // ── Profile (real) ───────────────────────────────────────────────────
 export type ApiProfile = {
   id: number
@@ -241,6 +252,13 @@ export function getProfileDonations(): Promise<ApiDonation[]> {
 }
 
 // ── Causes (real) ────────────────────────────────────────────────────
+export type ApiGoal = {
+  title: string
+  target_amount: string
+  current_amount: string
+  percent: number
+}
+
 export type ApiCause = {
   id: number
   title: string
@@ -252,6 +270,7 @@ export type ApiCause = {
   is_active: boolean
   created_at: string
   updated_at: string
+  active_goal: ApiGoal | null
 }
 
 export async function fetchCauses(params?: URLSearchParams): Promise<ApiCause[]> {

@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from django.db.models import Q
 from rest_framework import serializers
-from .models import Campaign, CampaignStore, Purchase, CashbackTransaction, ReceiptUpload
+from .models import Campaign, CampaignStore, Purchase, CashbackTransaction, ReceiptUpload, Goal
 
 
 class CampaignStoreSerializer(serializers.ModelSerializer):
@@ -163,4 +163,10 @@ class ReceiptUploadSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class GoalSerializer(serializers.ModelSerializer):
+    current_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    percent = serializers.IntegerField(read_only=True)
 
+    class Meta:
+        model = Goal
+        fields = ("title", "target_amount", "current_amount", "percent")
